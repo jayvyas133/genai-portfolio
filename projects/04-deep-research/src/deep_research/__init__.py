@@ -1,2 +1,1 @@
-﻿"""Deep Research."""
-
+"""Deep Research."""

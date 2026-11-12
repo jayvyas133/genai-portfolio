@@ -38,3 +38,4 @@ markers = [
 python_version = "3.12"
 strict = true
 plugins = ["pydantic.mypy"]
+files = ["packages/*/src", "projects/*/src"]
