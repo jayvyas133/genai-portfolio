@@ -1,0 +1,40 @@
+[project]
+name = "genai-portfolio"
+version = "0.1.0"
+description = "Portfolio of 5 production-style AI projects sharing a common platform layer (aicore)."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = []
+
+[tool.uv.workspace]
+members = ["packages/*", "projects/*"]
+
+[tool.uv.sources]
+aicore = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "ruff>=0.6",
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "mypy>=1.11",
+    "pre-commit>=3.8",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[tool.pytest.ini_options]
+markers = [
+    "eval: offline evaluation tests used as the CI quality gate",
+    "integration: tests that hit real providers/services (excluded from default CI test job)",
+]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]

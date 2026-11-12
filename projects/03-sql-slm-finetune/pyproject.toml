@@ -1,0 +1,25 @@
+[project]
+name = "sql-slm-finetune"
+version = "0.1.0"
+description = "Fine-tune a small language model for SQL generation; serve with vLLM."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "aicore",
+]
+
+[project.optional-dependencies]
+# Heavy GPU deps kept optional so the workspace installs on any machine.
+train = ["torch", "transformers", "datasets", "peft", "trl"]
+# vLLM ships Linux/CUDA wheels only; on Windows run it via WSL or Docker.
+serve = ["vllm>=0.6; sys_platform == 'linux'"]
+
+[tool.uv.sources]
+aicore = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sql_slm_finetune"]
