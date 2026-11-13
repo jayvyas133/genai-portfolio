@@ -29,6 +29,10 @@ target-version = "py312"
 select = ["E", "F", "I", "B", "UP", "SIM"]
 
 [tool.pytest.ini_options]
+testpaths = ["packages", "projects"]
+addopts = ["--import-mode=importlib"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 markers = [
     "eval: offline evaluation tests used as the CI quality gate",
     "integration: tests that hit real providers/services (excluded from default CI test job)",
