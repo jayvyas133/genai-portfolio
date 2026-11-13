@@ -5,6 +5,7 @@ description = "Shared platform layer for the AI portfolio projects."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "httpx>=0.28.1",
     "pydantic>=2.8",
     "pydantic-settings>=2.4",
 ]

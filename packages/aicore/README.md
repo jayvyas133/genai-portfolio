@@ -11,6 +11,7 @@ the same everywhere.
 |---|---|---|
 | M0 | Workspace, tooling, CI (Continuous Integration) skeleton | done |
 | M1 | Provider-agnostic LLM client: retries, timeouts, structured output | done |
+| M1.5 | Ollama adapter (local models) and provider factory | done |
 | M2 | Observability and cost tracking | planned |
 | M3 | Caching and guardrails | planned |
 | M4 | Evaluation harness | planned |
@@ -28,11 +29,15 @@ Each project needs to call an LLM. If every project calls a vendor SDK
 
 ```mermaid
 flowchart LR
+    S[LLMSettings] --> B[build_provider]
+    B --> F[FakeProvider]
+    B --> O[OllamaProvider]
     P[Project code] -->|LLMRequest| C[LLMClient]
     C -->|timeout + retry loop| I{{LLMProvider protocol}}
-    I --> F[FakeProvider]
-    I -.-> G[Gemini adapter - planned]
-    I -.-> O[Ollama adapter - planned]
+    I --> F
+    I --> O
+    I -.-> W[Cloudflare adapter - planned]
+    O -->|HTTP| L[(Local Ollama server)]
     C -->|LLMResponse / Pydantic model| P
 ```
 
@@ -45,6 +50,12 @@ flowchart LR
   provides structured output.
 - **`FakeProvider`** (`providers/fakeai.py`): a scripted, offline provider
   for tests and local development. It records every request in `.calls`.
+- **`OllamaProvider`** (`providers/ollama.py`): calls a local Ollama
+  server's `/api/chat` with `httpx` and maps HTTP (Hypertext Transfer
+  Protocol) status codes and network failures onto aicore errors.
+- **`build_provider`** (`providers/factory.py`): reads
+  `settings.provider` and returns the matching adapter. It is the only
+  place that knows every adapter.
 - **Errors** (`errors.py`): `RetryableError` (rate limit, timeout,
   unavailable) and `NonRetryableError` (for example, authentication). Only
   retryable errors are retried.
@@ -84,6 +95,23 @@ async def main() -> None:
 asyncio.run(main())
 ```
 
+### Using a real provider
+
+```python
+from aicore.client import LLMClient
+from aicore.config import LLMSettings
+from aicore.providers.factory import build_provider
+
+settings = LLMSettings()  # AICORE_PROVIDER=ollama in .env
+provider = build_provider(settings)
+client = LLMClient(provider, settings)
+```
+
+Ollama setup: install it, run `ollama pull qwen2.5:0.5b`, then set
+`AICORE_MODEL=qwen2.5:0.5b`. On a CPU-only (Central Processing Unit)
+laptop, the first call loads the model into RAM (Random Access Memory)
+and can take 10–30 s, so raise `AICORE_TIMEOUT_S` (for example, to 120).
+
 ## Configuration
 
 Settings are read from environment variables (or a `.env` file) with the
@@ -91,11 +119,12 @@ prefix `AICORE_`. They are validated at startup.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `AICORE_PROVIDER` | `fake` | Which adapter to use |
+| `AICORE_PROVIDER` | `fake` | Which adapter to use: `fake` or `ollama` |
 | `AICORE_MODEL` | `fake-model` | Model used when a request does not set one |
 | `AICORE_API_KEY` | unset | Provider key, stored as a `SecretStr` so it is never printed |
 | `AICORE_TIMEOUT_S` | `30.0` | Timeout per attempt, in seconds |
 | `AICORE_MAX_RETRIES` | `3` | Retries after the first attempt (so 4 calls at most) |
+| `AICORE_OLLAMA_BASE_URL` | `http://localhost:11434` | Root URL of the Ollama server |
 
 ## Reliability behaviour
 
@@ -115,6 +144,17 @@ prefix `AICORE_`. They are validated at startup.
   raises `StructuredOutputError`, which keeps the raw text. It is **not**
   retried.
 
+## Ollama error mapping
+
+| Failure | aicore error | Retried? |
+|---|---|---|
+| Connection refused / network error | `ProviderUnavailableError` | yes |
+| HTTP client timeout | `ProviderTimeoutError` | yes |
+| 429 | `RateLimitError` (reads `Retry-After` seconds) | yes |
+| 5xx | `ProviderUnavailableError` | yes |
+| 401 / 403 | `AuthenticationError` | no |
+| 404 (unknown model) and other 4xx | `InvalidRequestError` | no |
+
 ## How to run the tests
 
 From the workspace root:
@@ -126,14 +166,28 @@ uv run ruff format --check .
 uv run mypy
 ```
 
-All tests use `FakeProvider`, so they need no network access and no API key.
+Unit tests use `FakeProvider` or `httpx.MockTransport`, so they need no
+network access and no API key. Integration tests are skipped by default;
+run them against a local Ollama with:
+
+```powershell
+uv run pytest -m integration -v
+```
 
 ## Trade-offs and future work
 
-- No vendor adapter yet. Gemini, Ollama and Cloudflare adapters come next.
+- Ollama is the only real adapter. Cloudflare Workers AI comes next;
+  Gemini is parked.
+- The `LLMProvider` protocol has no `aclose`, so code holding a plain
+  `LLMProvider` cannot close `OllamaProvider`'s connection pool. This
+  will be fixed when a long-running service needs clean shutdown.
+- `Retry-After` in HTTP-date form is ignored; the computed backoff is
+  used instead.
 - Validation failures are not retried. A "repair" retry, which sends the
   validation error back to the model, may be added once eval data shows it
   is worth the extra cost.
 - Latency and cost numbers will be added in M2, when tracing lands.
 - See [ADR 0001](../../docs/adr/0001-provider-interface.md) for why the
-  client is built around a provider protocol.
+  client is built around a provider protocol, and
+  [ADR 0002](../../docs/adr/0002-ollama-adapter-raw-httpx.md) for why the
+  Ollama adapter uses raw `httpx`.

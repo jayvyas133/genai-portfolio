@@ -7,8 +7,10 @@ and production. Values are validated at startup to fail fast on bad config.
 
 from typing import Literal
 
-from pydantic import Field, SecretStr
+from pydantic import Field, HttpUrl, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+ProviderName = Literal["fake", "ollama"]
 
 
 class LLMSettings(BaseSettings):
@@ -23,8 +25,9 @@ class LLMSettings(BaseSettings):
         extra="ignore",
     )
 
-    provider: Literal["fake"] = "fake"
+    provider: ProviderName = "fake"
     model: str = "fake-model"
     api_key: SecretStr | None = None
     timeout_s: float = Field(default=30.0, gt=0)
     max_retries: int = Field(default=3, ge=0)
+    ollama_base_url: HttpUrl = HttpUrl("http://localhost:11434")

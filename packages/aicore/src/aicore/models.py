@@ -33,7 +33,7 @@ class LLMRequest(BaseModel):
 
 
 class Usage(BaseModel):
-    """Token counts reported by the provider for one call"""
+    """Token counts reported by the provider for one call."""
 
     input_tokens: int = Field(ge=0)
     output_tokens: int = Field(ge=0)
