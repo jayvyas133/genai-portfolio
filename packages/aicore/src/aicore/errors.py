@@ -49,6 +49,15 @@ class InvalidRequestError(NonRetryableError):
     """The provider rejected the request as malformed (HTTP 400)."""
 
 
+class QuotaExhaustedError(NonRetryableError):
+    """The account's usage allowance is used up.
+
+    Unlike ``RateLimitError``, waiting a few seconds
+    does not help; the quota resets on the provider's
+    schedule (e.g. daily), so retrying is wasted work.
+    """
+
+
 class StructuredOutputError(LLMError):
     """The model's reply could not be parsed into the requested schema."""
 

@@ -8,14 +8,12 @@ import httpx
 from pydantic import BaseModel
 
 from aicore.errors import (
-    AuthenticationError,
     InvalidRequestError,
-    LLMError,
     ProviderTimeoutError,
     ProviderUnavailableError,
-    RateLimitError,
 )
 from aicore.models import LLMRequest, LLMResponse, Usage
+from aicore.providers._http import map_status_error
 
 
 class _OllamaMessage(BaseModel):
@@ -86,7 +84,11 @@ class OllamaProvider:
             raise ProviderUnavailableError(msg) from exc
 
         if response.is_error:
-            raise _map_status_error(response)
+            raise map_status_error(
+                response,
+                vendor="Ollama",
+                detail=_error_detail(response),
+            )
 
         body = _OllamaChatResponse.model_validate_json(response.content)
         return LLMResponse(
@@ -116,23 +118,6 @@ def _to_payload(request: LLMRequest) -> dict[str, object]:
     }
 
 
-def _map_status_error(response: httpx.Response) -> LLMError:
-    """Translate a non-2xx Ollama response into an aicore error.
-
-    Returns the error instead of raising it, so the ``raise`` stays
-    visible at the call site and tracebacks point there.
-    """
-    status = response.status_code
-    message = f"Ollama returned {status}: {_error_detail(response)}"
-    if status == 429:
-        return RateLimitError(message, _parse_retry_after(response))
-    if status >= 500:
-        return ProviderUnavailableError(message)
-    if status in (401, 403):
-        return AuthenticationError(message)
-    return InvalidRequestError(message)
-
-
 def _error_detail(response: httpx.Response) -> str:
     """Return Ollama's ``{"error": "..."}`` text, or the raw body."""
     try:
@@ -142,15 +127,3 @@ def _error_detail(response: httpx.Response) -> str:
     if isinstance(body, dict) and "error" in body:
         return str(body["error"])
     return response.text[:200]
-
-
-def _parse_retry_after(response: httpx.Response) -> float | None:
-    """Read ``Retry-After`` as seconds; ``None`` if absent or a date."""
-    value = response.headers.get("Retry-After")
-    if value is None:
-        return None
-    try:
-        return max(0.0, float(value))
-    except ValueError:
-        # HTTP-date form: let LLMClient use its computed backoff instead.
-        return None

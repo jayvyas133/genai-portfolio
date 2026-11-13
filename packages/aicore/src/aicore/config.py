@@ -10,13 +10,15 @@ from typing import Literal
 from pydantic import Field, HttpUrl, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-ProviderName = Literal["fake", "ollama"]
+ProviderName = Literal["fake", "ollama", "cloudflare"]
 
 
 class LLMSettings(BaseSettings):
     """Settings for the LLM client.
 
     Example: ``AICORE_TIMEOUT_S=10`` sets ``timeout_s`` to 10 seconds.
+    Cloudflare uses ``api_key`` for its API token and
+    ``cloudflare_account_id`` for the account in the URL.
     """
 
     model_config = SettingsConfigDict(
@@ -31,3 +33,4 @@ class LLMSettings(BaseSettings):
     timeout_s: float = Field(default=30.0, gt=0)
     max_retries: int = Field(default=3, ge=0)
     ollama_base_url: HttpUrl = HttpUrl("http://localhost:11434")
+    cloudflare_account_id: str | None = None
