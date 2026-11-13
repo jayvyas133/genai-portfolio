@@ -25,14 +25,16 @@ _QUOTA_EXHAUSTED = 3036
 
 
 class _CloudflareUsage(BaseModel):
-    """Token counts inside ``result.usage``.
+    """Usage inside ``result.usage``.
 
     Counts default to 0 because some models omit
-    usage entirely.
+    usage entirely. ``neurons`` is optional: it is
+    read when Cloudflare sends it, else ``None``.
     """
 
     prompt_tokens: int = 0
     completion_tokens: int = 0
+    neurons: float | None = None
 
 
 class _CloudflareResult(BaseModel):
@@ -81,6 +83,8 @@ class CloudflareProvider:
     The provider owns an ``httpx.AsyncClient``; call
     ``aclose`` when done.
     """
+
+    name = "cloudflare"
 
     def __init__(
         self,
@@ -150,6 +154,7 @@ class CloudflareProvider:
             usage=Usage(
                 input_tokens=result.usage.prompt_tokens,
                 output_tokens=result.usage.completion_tokens,
+                neurons=result.usage.neurons,
             ),
         )
 

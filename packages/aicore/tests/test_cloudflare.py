@@ -38,6 +38,7 @@ OK_BODY = {
         "usage": {
             "prompt_tokens": 41,
             "completion_tokens": 7,
+            "neurons": 0.95,
         },
     },
     "success": True,
@@ -101,6 +102,7 @@ async def test_complete_maps_reply_and_usage() -> None:
     assert reply.model == SERVED
     assert reply.usage.input_tokens == 41
     assert reply.usage.output_tokens == 7
+    assert reply.usage.neurons == 0.95
 
 
 async def test_complete_sends_expected_request() -> None:
@@ -132,6 +134,7 @@ async def test_missing_model_and_usage_fall_back() -> None:
     assert reply.model == MODEL
     assert reply.usage.input_tokens == 0
     assert reply.usage.output_tokens == 0
+    assert reply.usage.neurons is None
 
 
 @pytest.mark.parametrize(

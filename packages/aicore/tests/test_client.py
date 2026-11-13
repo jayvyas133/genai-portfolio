@@ -36,6 +36,8 @@ def make_client(
 class SlowProvider:
     """Provider that never answers in time, used to exercise the timeout path."""
 
+    name = "slow"
+
     def __init__(self) -> None:
         """Start with zero recorded calls."""
         self.calls = 0

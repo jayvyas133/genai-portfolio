@@ -16,6 +16,9 @@ class LLMProvider(Protocol):
     inheriting from it is not required. mypy verifies the match statically.
     """
 
+    name: str
+    """Short provider ID, as in ``AICORE_PROVIDER``."""
+
     async def complete(self, request: LLMRequest) -> LLMResponse:
         """Send one request to the backend and return a normalized response.
 

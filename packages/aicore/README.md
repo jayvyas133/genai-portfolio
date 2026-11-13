@@ -13,7 +13,8 @@ the same everywhere.
 | M1 | Provider-agnostic LLM client: retries, timeouts, structured output | done |
 | M1.5 | Ollama adapter (local models) and provider factory | done |
 | M1.6 | Cloudflare Workers AI adapter (hosted, free tier) | done |
-| M2 | Observability and cost tracking | planned |
+| M2 | Observability and cost tracking | done |
+| M2.5 | Langfuse exporter | planned |
 | M3 | Caching and guardrails | planned |
 | M4 | Evaluation harness | planned |
 
@@ -42,10 +43,16 @@ flowchart LR
     CF -->|HTTPS| WA[(Cloudflare Workers AI)]
     O -->|HTTP| L[(Local Ollama server)]
     C -->|LLMResponse / Pydantic model| P
+    C -->|one CallRecord per call| T{{Tracer protocol}}
+    PR[pricing.cost_usd] --> C
+    T --> NT[NullTracer]
+    T --> MT[InMemoryTracer]
+    T --> LT[LogTracer]
 ```
 
-- **`LLMProvider`** (`providers/base.py`): a `typing.Protocol` with one
-  method, `async complete(request) -> LLMResponse`. Adapters only translate
+- **`LLMProvider`** (`providers/base.py`): a `typing.Protocol` with a
+  `name` attribute (for example `"ollama"`) and one method,
+  `async complete(request) -> LLMResponse`. Adapters only translate
   to and from a vendor API (Application Programming Interface) and map vendor
   errors onto aicore's error types.
 - **`LLMClient`** (`client.py`): the single entry point. It adds a timeout on
@@ -67,6 +74,12 @@ flowchart LR
 - **Errors** (`errors.py`): `RetryableError` (rate limit, timeout,
   unavailable) and `NonRetryableError` (for example, authentication or
   `QuotaExhaustedError`). Only retryable errors are retried.
+- **Tracing** (`tracing.py`): after every call, `LLMClient` sends one
+  `CallRecord` to a `Tracer`. Tracers: `NullTracer` (default, drops
+  records), `InMemoryTracer` (tests), `LogTracer` (one JSON line per call
+  on the `aicore.trace` logger).
+- **Pricing** (`pricing.py`): `cost_usd(provider, usage)` turns reported
+  usage into US dollars.
 
 ## Usage
 
@@ -160,6 +173,87 @@ prefix `AICORE_`. They are validated at startup.
   raises `StructuredOutputError`, which keeps the raw text. It is **not**
   retried.
 
+## Tracing and cost
+
+Pass a tracer to the client to get one record per call:
+
+```python
+import logging
+
+from aicore.client import LLMClient
+from aicore.tracing import LogTracer
+
+logging.basicConfig(level=logging.INFO)
+client = LLMClient(provider, settings, tracer=LogTracer())
+```
+
+Each call then logs one line like this:
+
+```text
+INFO:aicore.trace:{"call_id":"5280bf...","provider":"fake","model":"fake-model",
+"started_at":"2026-11-13T12:57:25.544689Z","latency_ms":0.12,"attempts":1,
+"outcome":"ok","usage":{"input_tokens":1,"output_tokens":1,"neurons":null},
+"cost_usd":0.0}
+```
+
+| Field | Meaning |
+|---|---|
+| `call_id` | Random ID, to match a log line to a trace later |
+| `provider` | Name reported by the provider object that served the call |
+| `model` | Model that actually served the call (Cloudflare may route to a variant) |
+| `started_at` | Start time, timezone-aware UTC |
+| `latency_ms` | Whole call, including retries and backoff sleeps |
+| `attempts` | Attempts made (1 = no retry) |
+| `outcome` | `ok`, or the error class name, for example `RateLimitError` |
+| `usage` | Tokens (and Cloudflare neurons); `null` when the call failed |
+| `cost_usd` | Cost in US dollars; `null` when unknown or failed |
+
+Rules:
+
+- **Exactly one record per call**: success, final failure, permanent
+  error or cancellation.
+- **Tracing never breaks a call.** If building or sending the record
+  fails, a warning is logged and the real result is returned.
+- **Cost:** Ollama and the fake provider cost `0.0` (no per-call bill).
+  Cloudflare costs neurons × USD 0.011 per 1,000 neurons, its paid-plan
+  list price; the free plan's 10,000 neurons per day are not charged. A
+  provider with no known price gets `null`, never `0`.
+- `complete_structured` is traced through `complete`. A reply that fails
+  validation is still `outcome="ok"`, because the transport succeeded.
+
+## Latency and cost (measured)
+
+`scripts/measure_llm.py` sends the same short prompt ("In one sentence,
+what is a vector database?", `max_tokens=64`) 5 times through
+`LLMClient` and reads the trace records. "Cold" is the first call (model
+load for Ollama; connection setup for Cloudflare); "warm" is the median
+of calls 2–5. Measured on 2026-11-13 on a CPU-only (Central Processing
+Unit) Windows laptop.
+
+| Provider | Model | Cold | Warm median | Tokens in/out | Neurons per call | Cost per call | Cost per 1,000 calls |
+|---|---|---|---|---|---|---|---|
+| Ollama (local) | `qwen2.5:0.5b` | 4,820 ms | 1,414 ms | 39 / 26 | n/a | USD 0 | USD 0 |
+| Cloudflare Workers AI | `@cf/meta/llama-3.1-8b-instruct` | 1,489 ms | 563 ms | 45 / 44 | 1.72 | USD 0.000019 | USD 0.019 |
+
+Reading the numbers:
+
+- The hosted 8B (8 billion parameter) model answers about 2.5× faster than
+  a 0.5B model on a laptop CPU, despite the network round trip.
+- At about 1.7 neurons per call, the free plan covers roughly 5,800 such
+  calls per day.
+- This is a latency and cost comparison only. The two models differ 16×
+  in size, so answer quality is not compared here; that needs the
+  evaluation harness (M4).
+- Five calls is a small sample: use these numbers as an order of
+  magnitude, not a benchmark.
+
+Reproduce:
+
+```powershell
+$env:AICORE_PROVIDER="cloudflare"; $env:AICORE_MODEL="@cf/meta/llama-3.1-8b-instruct"
+uv run python scripts/measure_llm.py 5
+```
+
 ## Ollama error mapping
 
 | Failure | aicore error | Retried? |
@@ -216,10 +310,15 @@ uv run pytest -m integration -v
 - Validation failures are not retried. A "repair" retry, which sends the
   validation error back to the model, may be added once eval data shows it
   is worth the extra cost.
-- Latency and cost numbers will be added in M2, when tracing lands.
+- No trace UI (User Interface) yet: the Langfuse exporter is M2.5.
+- The neuron price is a hard-coded list price and can go stale. There is
+  no per-token price table yet; it arrives with the first token-billed
+  provider.
 - See [ADR 0001](../../docs/adr/0001-provider-interface.md) for why the
   client is built around a provider protocol, and
   [ADR 0002](../../docs/adr/0002-ollama-adapter-raw-httpx.md) for why the
   Ollama adapter uses raw `httpx`, and
   [ADR 0003](../../docs/adr/0003-cloudflare-workers-ai-adapter.md) for the
-  Cloudflare adapter and its error-code mapping.
+  Cloudflare adapter and its error-code mapping, and
+  [ADR 0004](../../docs/adr/0004-tracing-and-cost.md) for tracing and
+  cost tracking.

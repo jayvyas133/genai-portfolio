@@ -41,6 +41,8 @@ class OllamaProvider:
     The provider owns an ``httpx.AsyncClient``; call ``aclose`` when done.
     """
 
+    name = "ollama"
+
     def __init__(
         self,
         base_url: str = "http://localhost:11434",

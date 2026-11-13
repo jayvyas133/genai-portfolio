@@ -24,6 +24,8 @@ class FakeProvider:
             many times (and with what) the provider was called.
     """
 
+    name = "fake"
+
     def __init__(
         self,
         script: Sequence[Outcome] = (),

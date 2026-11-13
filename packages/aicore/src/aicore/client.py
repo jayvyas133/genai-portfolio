@@ -7,7 +7,10 @@ and reliability behaves the same across all backends.
 
 import asyncio
 import json
+import logging
 import random
+import time
+from datetime import UTC, datetime
 
 from pydantic import BaseModel, ValidationError
 
@@ -19,7 +22,11 @@ from aicore.errors import (
     StructuredOutputError,
 )
 from aicore.models import LLMRequest, LLMResponse, Message
+from aicore.pricing import cost_usd
 from aicore.providers.base import LLMProvider
+from aicore.tracing import CallRecord, NullTracer, Tracer
+
+_log = logging.getLogger(__name__)
 
 
 class LLMClient:
@@ -37,6 +44,7 @@ class LLMClient:
         *,
         base_delay_s: float = 0.5,
         max_delay_s: float = 8.0,
+        tracer: Tracer | None = None,
     ) -> None:
         """Create a client around ``provider``.
 
@@ -44,19 +52,24 @@ class LLMClient:
             provider: Any object satisfying the ``LLMProvider`` protocol.
             settings: Timeout, retry and model defaults; loaded from the
                 environment when omitted.
-             base_delay_s: Backoff ceiling for the first retry; doubles each time.
+                base_delay_s: Backoff ceiling for the first retry; doubles each time.
                 Tests pass 0 so retries happen instantly.
             max_delay_s: Upper bound for the backoff ceiling.
+            tracer: Receives one ``CallRecord`` per call.
+                Defaults to ``NullTracer`` (no tracing).
         """
         self._provider = provider
         self._settings = settings or LLMSettings()
         self._base_delay_s = base_delay_s
         self._max_delay_s = max_delay_s
+        self._tracer = tracer or NullTracer()
 
     async def complete(self, request: LLMRequest) -> LLMResponse:
         """Send ``request``, retrying transient failures with backoff.
 
         Makes at most ``1 + settings.max_retries`` attempts.
+        Sends exactly one ``CallRecord`` to the tracer,
+        whether the call succeeds or fails.
 
         Raises:
             RetryableError: If every attempt failed with a transient error.
@@ -65,15 +78,27 @@ class LLMClient:
         if request.model is None:
             request = request.model_copy(update={"model": self._settings.model})
 
-        attempt = 0
-        while True:
-            try:
-                return await self._call_once(request)
-            except RetryableError as err:
-                if attempt >= self._settings.max_retries:
-                    raise  # out of retries: surface the last error unchanged
-                await asyncio.sleep(self._backoff_delay(attempt, err))
-                attempt += 1
+        started_at = datetime.now(UTC)
+        start = time.perf_counter()
+        attempts = 0
+        response: LLMResponse | None = None
+        outcome = "ok"
+        try:
+            while True:
+                attempts += 1
+                try:
+                    response = await self._call_once(request)
+                    return response
+                except RetryableError as err:
+                    if attempts > self._settings.max_retries:
+                        raise  # out of retries: surface the last error
+                    delay = self._backoff_delay(attempts - 1, err)
+                    await asyncio.sleep(delay)
+        except BaseException as err:
+            outcome = type(err).__name__
+            raise
+        finally:
+            self._trace(request, response, started_at, start, attempts, outcome)
 
     async def complete_structured[T: BaseModel](self, request: LLMRequest, schema: type[T]) -> T:
         """Send ``request`` and parse the reply into an instance of ``schema``.
@@ -121,6 +146,40 @@ class LLMClient:
             return err.retry_after_s
         ceiling = min(self._max_delay_s, self._base_delay_s * 2**attempt)
         return random.uniform(0, ceiling)
+
+    def _trace(
+        self,
+        request: LLMRequest,
+        response: LLMResponse | None,
+        started_at: datetime,
+        start: float,
+        attempts: int,
+        outcome: str,
+    ) -> None:
+        """Build a ``CallRecord`` and hand it to the tracer.
+
+        Any error here is logged and swallowed:
+        tracing must never break or change the
+        result of an LLM call.
+        """
+        try:
+            latency_ms = (time.perf_counter() - start) * 1000
+            provider = self._provider.name
+            usage = response.usage if response else None
+            model = response.model if response else request.model
+            rec = CallRecord(
+                provider=provider,
+                model=model or "unknown",
+                started_at=started_at,
+                latency_ms=latency_ms,
+                attempts=attempts,
+                outcome=outcome,
+                usage=usage,
+                cost_usd=cost_usd(provider, usage) if usage else None,
+            )
+            self._tracer.record(rec)
+        except Exception:
+            _log.warning("tracing failed", exc_info=True)
 
 
 def _strip_code_fences(text: str) -> str:

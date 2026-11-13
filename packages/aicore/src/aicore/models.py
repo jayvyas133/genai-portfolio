@@ -33,10 +33,16 @@ class LLMRequest(BaseModel):
 
 
 class Usage(BaseModel):
-    """Token counts reported by the provider for one call."""
+    """Usage reported by the provider for one call.
+
+    ``neurons`` is Cloudflare's billing unit.
+    It stays ``None`` for providers that bill
+    by tokens only (or not at all).
+    """
 
     input_tokens: int = Field(ge=0)
     output_tokens: int = Field(ge=0)
+    neurons: float | None = Field(default=None, ge=0)
 
     @property
     def total_tokens(self) -> int:
