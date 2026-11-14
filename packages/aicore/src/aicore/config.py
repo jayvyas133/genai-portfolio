@@ -19,6 +19,8 @@ class LLMSettings(BaseSettings):
     Example: ``AICORE_TIMEOUT_S=10`` sets ``timeout_s`` to 10 seconds.
     Cloudflare uses ``api_key`` for its API token and
     ``cloudflare_account_id`` for the account in the URL.
+    ``cache_ttl_s`` is how long a cached reply lives
+    (default one day).
     """
 
     model_config = SettingsConfigDict(
@@ -31,6 +33,7 @@ class LLMSettings(BaseSettings):
     model: str = "fake-model"
     api_key: SecretStr | None = None
     timeout_s: float = Field(default=30.0, gt=0)
+    cache_ttl_s: int = Field(default=86_400, gt=0)
     max_retries: int = Field(default=3, ge=0)
     ollama_base_url: HttpUrl = HttpUrl("http://localhost:11434")
     cloudflare_account_id: str | None = None

@@ -14,8 +14,9 @@ the same everywhere.
 | M1.5 | Ollama adapter (local models) and provider factory | done |
 | M1.6 | Cloudflare Workers AI adapter (hosted, free tier) | done |
 | M2 | Observability and cost tracking | done |
-| M2.5 | Langfuse exporter | planned |
-| M3 | Caching and guardrails | planned |
+| M2.5 | Langfuse exporter | parked |
+| M3 | Response caching (in-memory and Redis) | done |
+| M3.5 | Guardrails | planned |
 | M4 | Evaluation harness | planned |
 
 ## Problem
@@ -48,6 +49,10 @@ flowchart LR
     T --> NT[NullTracer]
     T --> MT[InMemoryTracer]
     T --> LT[LogTracer]
+    C -->|temperature 0: get / set| RC{{ResponseCache protocol}}
+    RC --> IC[InMemoryCache]
+    RC --> RD[RedisCache]
+    RD -->|SET key value EX ttl| R[(Redis)]
 ```
 
 - **`LLMProvider`** (`providers/base.py`): a `typing.Protocol` with a
@@ -80,6 +85,9 @@ flowchart LR
   on the `aicore.trace` logger).
 - **Pricing** (`pricing.py`): `cost_usd(provider, usage)` turns reported
   usage into US dollars.
+- **Caching** (`cache.py`, `redis_cache.py`): a `ResponseCache` protocol
+  with `InMemoryCache` (tests) and `RedisCache` (shared between
+  processes, entries expire after a TTL (time to live)).
 
 ## Usage
 
@@ -154,6 +162,7 @@ prefix `AICORE_`. They are validated at startup.
 | `AICORE_MAX_RETRIES` | `3` | Retries after the first attempt (so 4 calls at most) |
 | `AICORE_OLLAMA_BASE_URL` | `http://localhost:11434` | Root URL of the Ollama server |
 | `AICORE_CLOUDFLARE_ACCOUNT_ID` | unset | Cloudflare account ID; required when the provider is `cloudflare` |
+| `AICORE_CACHE_TTL_S` | `86400` | Seconds a cached reply lives in Redis (one day) |
 
 ## Reliability behaviour
 
@@ -203,8 +212,9 @@ INFO:aicore.trace:{"call_id":"5280bf...","provider":"fake","model":"fake-model",
 | `model` | Model that actually served the call (Cloudflare may route to a variant) |
 | `started_at` | Start time, timezone-aware UTC |
 | `latency_ms` | Whole call, including retries and backoff sleeps |
-| `attempts` | Attempts made (1 = no retry) |
+| `attempts` | Attempts made (1 = no retry; 0 = cache hit) |
 | `outcome` | `ok`, or the error class name, for example `RateLimitError` |
+| `cached` | `true` when the reply came from the response cache |
 | `usage` | Tokens (and Cloudflare neurons); `null` when the call failed |
 | `cost_usd` | Cost in US dollars; `null` when unknown or failed |
 
@@ -220,6 +230,37 @@ Rules:
   provider with no known price gets `null`, never `0`.
 - `complete_structured` is traced through `complete`. A reply that fails
   validation is still `outcome="ok"`, because the transport succeeded.
+
+## Response caching
+
+Pass a cache to the client. Requests with `temperature == 0` (the
+default) are then answered from the cache when the same request was
+seen before:
+
+```python
+from aicore.client import LLMClient
+from aicore.redis_cache import RedisCache
+
+cache = RedisCache.from_url("redis://localhost:6379/0", settings.cache_ttl_s)
+client = LLMClient(provider, settings, cache=cache)
+...
+await cache.aclose()  # on shutdown
+```
+
+Start Redis with `docker compose -f infra/docker-compose.yml up -d redis`.
+
+Rules:
+
+- **Exact match.** The key is a SHA-256 (Secure Hash Algorithm) hash of
+  the provider name and the whole request (messages, model, temperature,
+  `max_tokens`, ...), prefixed `aicore:v1:`. The default model is filled
+  in before hashing, so changing `AICORE_MODEL` never reuses old replies.
+- **Only `temperature == 0`** is cached; sampled replies are meant to vary.
+- **A broken cache is a miss.** Redis down or a corrupt entry is logged
+  as a warning and the provider is called; the corrupt entry is then
+  overwritten with the fresh reply.
+- **Only successful replies are stored.**
+- **Hits are traced** with `cached=true`, `attempts=0` and `cost_usd=0.0`.
 
 ## Latency and cost (measured)
 
@@ -252,6 +293,28 @@ Reproduce:
 ```powershell
 $env:AICORE_PROVIDER="cloudflare"; $env:AICORE_MODEL="@cf/meta/llama-3.1-8b-instruct"
 uv run python scripts/measure_llm.py 5
+```
+
+### Cache hit vs miss
+
+With `REDIS_URL` set, the script uses `RedisCache`. A random tag in the
+prompt makes call 1 a real miss; calls 2–6 are hits. Measured on
+2026-11-14, Redis 7 in Docker Desktop on the same laptop, Cloudflare
+`@cf/meta/llama-3.1-8b-instruct`, 6 calls:
+
+| | Latency | Cost per call |
+|---|---|---|
+| Miss (provider call) | 798 ms | USD 0.0000175 |
+| Hit (median of 5) | 1.3 ms | USD 0 |
+
+- A hit is roughly 600× faster and uses no neurons.
+- With the fake provider, the miss still took about 110 ms: that is the
+  first Redis connection being opened, not the provider. A long-running
+  service should open the connection at startup.
+
+```powershell
+$env:REDIS_URL="redis://localhost:6379/0"
+uv run python scripts/measure_llm.py 6
 ```
 
 ## Ollama error mapping
@@ -287,10 +350,12 @@ uv run ruff format --check .
 uv run mypy
 ```
 
-Unit tests use `FakeProvider` or `httpx.MockTransport`, so they need no
-network access and no API key. Integration tests are skipped by default.
-They call a local Ollama and, if credentials are set, the real Cloudflare
-API (a few neurons per run):
+Unit tests use `FakeProvider`, `httpx.MockTransport` or `InMemoryCache`,
+so they need no network access and no API key. Integration tests are
+skipped by default. They call a local Ollama, Redis (from Docker
+Compose) and, if credentials are set, the real Cloudflare API (a few
+neurons per run). Each one skips itself when its service is not
+reachable:
 
 ```powershell
 uv run pytest -m integration -v
@@ -314,6 +379,13 @@ uv run pytest -m integration -v
 - The neuron price is a hard-coded list price and can go stale. There is
   no per-token price table yet; it arrives with the first token-billed
   provider.
+- The cache is exact-match only. A semantic cache (matching similar
+  prompts by embedding) is deferred until the evaluation harness (M4)
+  can measure how often it would return a wrong answer.
+- No cache stampede protection: two processes that miss at the same
+  moment both call the provider.
+- Cached replies sit in Redis as plain text; prompts with personal or
+  secret data need a short TTL or no cache.
 - See [ADR 0001](../../docs/adr/0001-provider-interface.md) for why the
   client is built around a provider protocol, and
   [ADR 0002](../../docs/adr/0002-ollama-adapter-raw-httpx.md) for why the
@@ -321,4 +393,6 @@ uv run pytest -m integration -v
   [ADR 0003](../../docs/adr/0003-cloudflare-workers-ai-adapter.md) for the
   Cloudflare adapter and its error-code mapping, and
   [ADR 0004](../../docs/adr/0004-tracing-and-cost.md) for tracing and
-  cost tracking.
+  cost tracking, and
+  [ADR 0005](../../docs/adr/0005-response-caching.md) for response
+  caching.

@@ -61,7 +61,7 @@ Option 3. Supporting details:
 
 ## Trade-offs
 
-- No trace UI yet; the Langfuse exporter is the next milestone (M2.5).
+- No trace UI yet; the Langfuse exporter (M2.5) is parked for later.
 - Validation failures in `complete_structured` are recorded as
   `outcome="ok"`, since the transport succeeded. Quality failures belong
   to the evaluation harness (M4).

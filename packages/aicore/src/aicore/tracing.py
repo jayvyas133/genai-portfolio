@@ -28,6 +28,9 @@ class CallRecord(BaseModel):
     the call failed, or when the cost is unknown.
     ``outcome`` is ``"ok"`` or the error's class
     name, for example ``"RateLimitError"``.
+    ``cached`` is True when the reply came from the
+    response cache; then ``attempts`` is 0 and
+    ``cost_usd`` is 0.0, because no provider was called.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -37,7 +40,8 @@ class CallRecord(BaseModel):
     model: str
     started_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     latency_ms: float = Field(ge=0)
-    attempts: int = Field(ge=1)
+    attempts: int = Field(ge=0)
+    cached: bool = False
     outcome: str
     usage: Usage | None = None
     cost_usd: float | None = Field(default=None, ge=0)

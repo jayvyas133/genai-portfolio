@@ -106,3 +106,24 @@ async def test_broken_tracer_does_not_break_call() -> None:
     reply = await client.complete(make_request())
 
     assert reply.text == "still works"
+
+
+def test_record_defaults_to_not_cached() -> None:
+    """Existing callers get ``cached=False``."""
+    rec = CallRecord(provider="fake", model="m", latency_ms=1, attempts=1, outcome="ok")
+    assert rec.cached is False
+
+
+def test_cache_hit_record_allows_zero_attempts() -> None:
+    """A hit made no provider call, so 0 attempts is valid."""
+    rec = CallRecord(
+        provider="fake",
+        model="m",
+        latency_ms=0.1,
+        attempts=0,
+        outcome="ok",
+        cached=True,
+        cost_usd=0.0,
+    )
+    assert rec.attempts == 0
+    assert rec.cached is True

@@ -14,6 +14,7 @@ from datetime import UTC, datetime
 
 from pydantic import BaseModel, ValidationError
 
+from aicore.cache import ResponseCache, cache_key
 from aicore.config import LLMSettings
 from aicore.errors import (
     ProviderTimeoutError,
@@ -21,7 +22,7 @@ from aicore.errors import (
     RetryableError,
     StructuredOutputError,
 )
-from aicore.models import LLMRequest, LLMResponse, Message
+from aicore.models import LLMRequest, LLMResponse, Message, Usage
 from aicore.pricing import cost_usd
 from aicore.providers.base import LLMProvider
 from aicore.tracing import CallRecord, NullTracer, Tracer
@@ -45,6 +46,7 @@ class LLMClient:
         base_delay_s: float = 0.5,
         max_delay_s: float = 8.0,
         tracer: Tracer | None = None,
+        cache: ResponseCache | None = None,
     ) -> None:
         """Create a client around ``provider``.
 
@@ -52,17 +54,20 @@ class LLMClient:
             provider: Any object satisfying the ``LLMProvider`` protocol.
             settings: Timeout, retry and model defaults; loaded from the
                 environment when omitted.
-                base_delay_s: Backoff ceiling for the first retry; doubles each time.
+            base_delay_s: Backoff ceiling for the first retry; doubles each time.
                 Tests pass 0 so retries happen instantly.
             max_delay_s: Upper bound for the backoff ceiling.
             tracer: Receives one ``CallRecord`` per call.
                 Defaults to ``NullTracer`` (no tracing).
+            cache: Stores replies to ``temperature == 0``
+                requests. Defaults to ``None`` (no caching).
         """
         self._provider = provider
         self._settings = settings or LLMSettings()
         self._base_delay_s = base_delay_s
         self._max_delay_s = max_delay_s
         self._tracer = tracer or NullTracer()
+        self._cache = cache
 
     async def complete(self, request: LLMRequest) -> LLMResponse:
         """Send ``request``, retrying transient failures with backoff.
@@ -70,6 +75,9 @@ class LLMClient:
         Makes at most ``1 + settings.max_retries`` attempts.
         Sends exactly one ``CallRecord`` to the tracer,
         whether the call succeeds or fails.
+        With a cache and ``temperature == 0``, a stored reply
+        is returned without calling the provider, and every
+        success is stored. Cache errors are logged, never raised.
 
         Raises:
             RetryableError: If every attempt failed with a transient error.
@@ -78,16 +86,25 @@ class LLMClient:
         if request.model is None:
             request = request.model_copy(update={"model": self._settings.model})
 
+        key = self._cache_key_for(request)
         started_at = datetime.now(UTC)
         start = time.perf_counter()
         attempts = 0
         response: LLMResponse | None = None
         outcome = "ok"
+        cached = False
         try:
+            if key is not None:
+                response = await self._cache_get(key)
+                if response is not None:
+                    cached = True
+                    return response
             while True:
                 attempts += 1
                 try:
                     response = await self._call_once(request)
+                    if key is not None:
+                        await self._cache_set(key, response)
                     return response
                 except RetryableError as err:
                     if attempts > self._settings.max_retries:
@@ -98,7 +115,15 @@ class LLMClient:
             outcome = type(err).__name__
             raise
         finally:
-            self._trace(request, response, started_at, start, attempts, outcome)
+            self._trace(
+                request,
+                response,
+                started_at,
+                start,
+                attempts,
+                outcome,
+                cached,
+            )
 
     async def complete_structured[T: BaseModel](self, request: LLMRequest, schema: type[T]) -> T:
         """Send ``request`` and parse the reply into an instance of ``schema``.
@@ -147,6 +172,35 @@ class LLMClient:
         ceiling = min(self._max_delay_s, self._base_delay_s * 2**attempt)
         return random.uniform(0, ceiling)
 
+    def _cache_key_for(self, request: LLMRequest) -> str | None:
+        """Return the cache key, or None if not cacheable.
+
+        Only deterministic requests (``temperature == 0``)
+        are cached; a sampled reply is meant to vary.
+        """
+        if self._cache is None or request.temperature != 0:
+            return None
+        return cache_key(self._provider.name, request)
+
+    async def _cache_get(self, key: str) -> LLMResponse | None:
+        """Look up ``key``; a broken cache counts as a miss."""
+        if self._cache is None:
+            return None
+        try:
+            return await self._cache.get(key)
+        except Exception:
+            _log.warning("cache read failed", exc_info=True)
+            return None
+
+    async def _cache_set(self, key: str, response: LLMResponse) -> None:
+        """Store ``response``; failures are logged, not raised."""
+        if self._cache is None:
+            return
+        try:
+            await self._cache.set(key, response)
+        except Exception:
+            _log.warning("cache write failed", exc_info=True)
+
     def _trace(
         self,
         request: LLMRequest,
@@ -155,6 +209,7 @@ class LLMClient:
         start: float,
         attempts: int,
         outcome: str,
+        cached: bool,
     ) -> None:
         """Build a ``CallRecord`` and hand it to the tracer.
 
@@ -174,12 +229,24 @@ class LLMClient:
                 latency_ms=latency_ms,
                 attempts=attempts,
                 outcome=outcome,
+                cached=cached,
                 usage=usage,
-                cost_usd=cost_usd(provider, usage) if usage else None,
+                cost_usd=self._cost(provider, usage, cached),
             )
             self._tracer.record(rec)
         except Exception:
             _log.warning("tracing failed", exc_info=True)
+
+    @staticmethod
+    def _cost(provider: str, usage: Usage | None, cached: bool) -> float | None:
+        """Return the call's cost in USD.
+
+        A cache hit cost nothing; otherwise use the
+        price table (``None`` when unknown or failed).
+        """
+        if cached:
+            return 0.0
+        return cost_usd(provider, usage) if usage else None
 
 
 def _strip_code_fences(text: str) -> str:
