@@ -1,8 +1,9 @@
 """The single entry point for LLM calls in every project.
 
-``LLMClient`` wraps any ``LLMProvider`` and adds per-attempt timeouts and
-retries with exponential backoff and jitter, so individual adapters stay small
-and reliability behaves the same across all backends.
+``LLMClient`` wraps any ``LLMProvider`` and adds guardrails, caching,
+per-attempt timeouts and retries with exponential backoff and jitter,
+and tracing, so individual adapters stay small and behave the same
+across all backends.
 """
 
 import asyncio
@@ -10,6 +11,7 @@ import json
 import logging
 import random
 import time
+from collections.abc import Sequence
 from datetime import UTC, datetime
 
 from pydantic import BaseModel, ValidationError
@@ -21,6 +23,12 @@ from aicore.errors import (
     RateLimitError,
     RetryableError,
     StructuredOutputError,
+)
+from aicore.guardrails import (
+    InputGuardrail,
+    OutputGuardrail,
+    apply_input_guards,
+    apply_output_guards,
 )
 from aicore.models import LLMRequest, LLMResponse, Message, Usage
 from aicore.pricing import cost_usd
@@ -36,6 +44,7 @@ class LLMClient:
     Only ``RetryableError`` failures are retried. Any other error (for example
     ``AuthenticationError``) is raised immediately, because sending the same
     request again cannot fix it.
+
     """
 
     def __init__(
@@ -47,6 +56,8 @@ class LLMClient:
         max_delay_s: float = 8.0,
         tracer: Tracer | None = None,
         cache: ResponseCache | None = None,
+        input_guards: Sequence[InputGuardrail] = (),
+        output_guards: Sequence[OutputGuardrail] = (),
     ) -> None:
         """Create a client around ``provider``.
 
@@ -61,6 +72,10 @@ class LLMClient:
                 Defaults to ``NullTracer`` (no tracing).
             cache: Stores replies to ``temperature == 0``
                 requests. Defaults to ``None`` (no caching).
+            input_guards: Run in order before the cache and the
+                provider; may redact the request or block it.
+            output_guards: Run on every reply (including cache hits)
+                before it is cached or returned.
         """
         self._provider = provider
         self._settings = settings or LLMSettings()
@@ -68,25 +83,29 @@ class LLMClient:
         self._max_delay_s = max_delay_s
         self._tracer = tracer or NullTracer()
         self._cache = cache
+        self._input_guards = tuple(input_guards)
+        self._output_guards = tuple(output_guards)
 
     async def complete(self, request: LLMRequest) -> LLMResponse:
         """Send ``request``, retrying transient failures with backoff.
 
+        Order: input guards, cache lookup, provider (with
+        retries, only on a miss), output guards, cache write.
         Makes at most ``1 + settings.max_retries`` attempts.
         Sends exactly one ``CallRecord`` to the tracer,
-        whether the call succeeds or fails.
+        whether the call succeeds, fails or is blocked.
         With a cache and ``temperature == 0``, a stored reply
-        is returned without calling the provider, and every
-        success is stored. Cache errors are logged, never raised.
+        is returned without calling the provider. Cache errors
+        are logged, never raised.
 
         Raises:
+            GuardrailError: If an input or output guard blocks the call.
             RetryableError: If every attempt failed with a transient error.
             NonRetryableError: On the first permanent failure.
         """
         if request.model is None:
             request = request.model_copy(update={"model": self._settings.model})
 
-        key = self._cache_key_for(request)
         started_at = datetime.now(UTC)
         start = time.perf_counter()
         attempts = 0
@@ -94,23 +113,27 @@ class LLMClient:
         outcome = "ok"
         cached = False
         try:
+            # Guard first: the redacted request is what gets
+            # hashed, cached, sent and traced.
+            request = apply_input_guards(self._input_guards, request)
+            key = self._cache_key_for(request)
             if key is not None:
                 response = await self._cache_get(key)
-                if response is not None:
-                    cached = True
-                    return response
-            while True:
+                cached = response is not None
+            while response is None:
                 attempts += 1
                 try:
                     response = await self._call_once(request)
-                    if key is not None:
-                        await self._cache_set(key, response)
-                    return response
                 except RetryableError as err:
                     if attempts > self._settings.max_retries:
                         raise  # out of retries: surface the last error
                     delay = self._backoff_delay(attempts - 1, err)
                     await asyncio.sleep(delay)
+            # Also on hits: guards may have changed since the write.
+            apply_output_guards(self._output_guards, request, response)
+            if key is not None and not cached:
+                await self._cache_set(key, response)
+            return response
         except BaseException as err:
             outcome = type(err).__name__
             raise

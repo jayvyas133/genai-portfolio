@@ -70,3 +70,25 @@ class StructuredOutputError(LLMError):
         """
         super().__init__(message)
         self.raw_text = raw_text
+
+
+class GuardrailError(NonRetryableError):
+    """A guardrail rejected the request or the reply.
+
+    Guards are deterministic, so resending the same
+    request would be rejected again; hence not retried.
+    """
+
+    def __init__(self, guard: str, reason: str) -> None:
+        """Record which guard fired and why.
+
+        Args:
+            guard: Name of the guard, e.g. ``"max_input_chars"``.
+            reason: Short, fixed description of the rule that
+                failed. Never include the offending text: errors
+                are logged and traced, and that text may be PII
+                (Personally Identifiable Information) or a secret.
+        """
+        super().__init__(f"{guard}: {reason}")
+        self.guard = guard
+        self.reason = reason

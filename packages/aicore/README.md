@@ -16,7 +16,7 @@ the same everywhere.
 | M2 | Observability and cost tracking | done |
 | M2.5 | Langfuse exporter | parked |
 | M3 | Response caching (in-memory and Redis) | done |
-| M3.5 | Guardrails | planned |
+| M3.5 | Guardrails: PII redaction, input limits, injection and secret-leak checks | done |
 | M4 | Evaluation harness | planned |
 
 ## Problem
@@ -36,6 +36,8 @@ flowchart LR
     B --> F[FakeProvider]
     B --> O[OllamaProvider]
     P[Project code] -->|LLMRequest| C[LLMClient]
+    C -->|input guards: redact / block| IG{{InputGuardrail protocol}}
+    C -->|output guards: block| OG{{OutputGuardrail protocol}}
     C -->|timeout + retry loop| I{{LLMProvider protocol}}
     I --> F
     I --> O
@@ -85,6 +87,9 @@ flowchart LR
   on the `aicore.trace` logger).
 - **Pricing** (`pricing.py`): `cost_usd(provider, usage)` turns reported
   usage into US dollars.
+- **Guardrails** (`guardrails.py`): `InputGuardrail` and
+  `OutputGuardrail` protocols, run inside `LLMClient`, plus four
+  built-in guards (see below).
 - **Caching** (`cache.py`, `redis_cache.py`): a `ResponseCache` protocol
   with `InMemoryCache` (tests) and `RedisCache` (shared between
   processes, entries expire after a TTL (time to live)).
@@ -262,6 +267,79 @@ Rules:
 - **Only successful replies are stored.**
 - **Hits are traced** with `cached=true`, `attempts=0` and `cost_usd=0.0`.
 
+## Guardrails
+
+Pass guards to the client. Input guards run in order, each on the
+previous one's result; put `MaxInputChars` first so oversized text is
+rejected before the other guards scan it:
+
+```python
+from aicore.guardrails import InjectionHeuristic, MaxInputChars, PIIRedactor, SecretLeakGuard
+
+client = LLMClient(
+    provider,
+    settings,
+    input_guards=[MaxInputChars(40_000), PIIRedactor(), InjectionHeuristic()],
+    output_guards=[SecretLeakGuard()],
+)
+```
+
+| Guard | Runs on | Action |
+|---|---|---|
+| `MaxInputChars(n)` | request | Blocks if all messages together exceed `n` characters (about 4 per English token) |
+| `PIIRedactor()` | request | Replaces emails, phone numbers and Luhn-valid card numbers with `[EMAIL]`, `[PHONE]`, `[CARD]` in user and assistant messages; system messages are kept |
+| `InjectionHeuristic()` | request | Blocks user messages with known injection phrases ("ignore previous instructions", "reveal your system prompt", ...) |
+| `SecretLeakGuard()` | reply | Blocks replies containing credential formats (AWS (Amazon Web Services) keys, GitHub tokens, `sk-` keys, private keys, JWTs (JSON Web Tokens), ...) |
+
+A blocked call raises `GuardrailError` (not retried) with `.guard` and
+`.reason`; the reason never contains the offending text. `redact_pii`
+is also usable on its own, for example to clean logs.
+
+Order inside `complete()`:
+
+```text
+input guards -> cache key -> cache lookup -> provider (on a miss)
+             -> output guards -> cache write -> return
+```
+
+- PII (Personally Identifiable Information) is redacted before the
+  cache key is built, so it never reaches the provider, the traces or
+  Redis.
+- A reply blocked by an output guard is never cached; output guards
+  also run on cache hits.
+- A blocked call is traced once with `outcome="GuardrailError"`. An
+  output block keeps its usage and cost, because the provider was paid.
+- `InjectionHeuristic` and `SecretLeakGuard` accept `extra_patterns`
+  (`(label, regex)` pairs) so a project can add rules.
+
+**Limits.** These are fast filters, not guarantees. The injection
+check misses paraphrases, other languages and encoded text; real
+protection is least privilege and checking what the model's output can
+trigger. The PII regexes miss formats such as `(415) 555-0123`, names
+and addresses, and can flag a 10-digit timestamp as a phone number. See
+[ADR 0006](../../docs/adr/0006-guardrails.md).
+
+### Guardrail overhead (measured)
+
+`scripts/measure_guards.py` runs all four guards on one request and its
+reply, median of 200 runs, 2026-11-14, same laptop:
+
+| Input | Size | Time |
+|---|---|---|
+| Short chat message | 99 chars | 0.04 ms |
+| RAG (Retrieval-Augmented Generation) prompt | 3,960 chars | 1.5 ms |
+| Large RAG context | 39,600 chars | 14.6 ms |
+| Worst case: digits and spaces | 40,000 chars | 33.0 ms |
+
+- Time grows linearly with size, including the worst case, so there is
+  no ReDoS (Regular expression Denial of Service).
+- Against an 800 ms provider call, that is 0.005% for chat and about 2%
+  for a 10,000-token prompt.
+
+```powershell
+uv run python scripts/measure_guards.py
+```
+
 ## Latency and cost (measured)
 
 `scripts/measure_llm.py` sends the same short prompt ("In one sentence,
@@ -382,6 +460,11 @@ uv run pytest -m integration -v
 - The cache is exact-match only. A semantic cache (matching similar
   prompts by embedding) is deferred until the evaluation harness (M4)
   can measure how often it would return a wrong answer.
+- Guardrails are regex-based. An NER (Named Entity Recognition) model or
+  Microsoft Presidio would catch names and addresses; an LLM-as-judge
+  injection check waits for the evaluation harness (M4) to measure it.
+- `CallRecord` does not yet name the guard that fired, and secrets in
+  the *input* are not checked.
 - No cache stampede protection: two processes that miss at the same
   moment both call the provider.
 - Cached replies sit in Redis as plain text; prompts with personal or
@@ -395,4 +478,5 @@ uv run pytest -m integration -v
   [ADR 0004](../../docs/adr/0004-tracing-and-cost.md) for tracing and
   cost tracking, and
   [ADR 0005](../../docs/adr/0005-response-caching.md) for response
-  caching.
+  caching, and
+  [ADR 0006](../../docs/adr/0006-guardrails.md) for guardrails.
