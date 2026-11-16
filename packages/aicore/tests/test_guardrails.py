@@ -1,5 +1,7 @@
 """Unit tests for guardrails and ``GuardrailError``."""
 
+from typing import NoReturn
+
 import pytest
 from aicore.errors import GuardrailError, NonRetryableError
 from aicore.guardrails import (
@@ -48,8 +50,12 @@ class BlockGuard:
         """Start with zero calls."""
         self.calls = 0
 
-    def check(self, *args: object) -> LLMRequest:
-        """Count the call, then reject."""
+    def check(self, *args: object) -> NoReturn:
+        """Count the call, then reject.
+
+        ``NoReturn`` fits both guard protocols: it is a subtype of the
+        input guard's ``LLMRequest`` and of the output guard's ``None``.
+        """
         self.calls += 1
         raise GuardrailError(self.name, "always blocks")
 

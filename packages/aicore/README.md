@@ -17,7 +17,7 @@ the same everywhere.
 | M2.5 | Langfuse exporter | parked |
 | M3 | Response caching (in-memory and Redis) | done |
 | M3.5 | Guardrails: PII redaction, input limits, injection and secret-leak checks | done |
-| M4 | Evaluation harness | planned |
+| M4 | Evaluation harness: datasets, scorers, runner, reports, eval gate | done |
 
 ## Problem
 
@@ -93,6 +93,9 @@ flowchart LR
 - **Caching** (`cache.py`, `redis_cache.py`): a `ResponseCache` protocol
   with `InMemoryCache` (tests) and `RedisCache` (shared between
   processes, entries expire after a TTL (time to live)).
+- **Evaluation** (`evals/`): golden datasets, scorers, a concurrent
+  runner, Markdown reports and precision/recall for detectors (see
+  [Evaluation harness](#evaluation-harness)).
 
 ## Usage
 
@@ -340,6 +343,90 @@ reply, median of 200 runs, 2026-11-14, same laptop:
 uv run python scripts/measure_guards.py
 ```
 
+## Evaluation harness
+
+Every project measures quality with the same small harness, before any
+tuning. It has no dependencies beyond Pydantic.
+
+```mermaid
+flowchart LR
+    D[(dataset.jsonl)] -->|load_dataset| C[EvalCase list]
+    C --> R[run_eval]
+    T[target: async case -> output] --> R
+    R -->|semaphore, errors kept| CR[CaseResult per case]
+    S{{Scorer protocol}} --> R
+    TR[InMemoryTracer] -->|llm_calls, total cost| R
+    CR --> E[EvalReport]
+    E --> M[to_markdown]
+    E --> B[binary_metrics: precision / recall]
+```
+
+```python
+from aicore.client import LLMClient
+from aicore.evals.dataset import load_dataset
+from aicore.evals.models import EvalCase
+from aicore.evals.report import to_markdown
+from aicore.evals.runner import run_eval
+from aicore.evals.scorers import Contains
+from aicore.models import LLMRequest, Message
+from aicore.tracing import InMemoryTracer
+
+tracer = InMemoryTracer()
+client = LLMClient(provider, settings, tracer=tracer)
+
+
+async def answer(case: EvalCase) -> str:
+    """The system under test: one LLM call per case."""
+    request = LLMRequest(messages=[Message(role="user", content=case.input)])
+    return (await client.complete(request)).text
+
+
+# inside an async function:
+cases = load_dataset("evals/questions.jsonl")
+report = await run_eval("qa-baseline", cases, answer, [Contains()], tracer=tracer)
+print(to_markdown(report))
+```
+
+| Part | What it does |
+|---|---|
+| `load_dataset` | Reads JSONL (JSON Lines), one `EvalCase(id, input, expected, tags)` per line; errors name `file:line`; duplicate ids and empty files are rejected |
+| `ExactMatch` | Equal after normalising case, spacing and a trailing period; labels and dicts compared as JSON |
+| `Contains` | Every expected substring is in the answer; partial credit in `value` |
+| `JSONValid(schema)` | Output fits a Pydantic schema (shape only) |
+| `NumericClose` | Number within a tolerance; accepts "1,234.5" and "1,23,456" |
+| `run_eval` | Runs the target with at most `concurrency` cases at once; a target error fails that case only |
+| `EvalReport` | Pass rate (overall and per scorer), errors, p50/p95 latency, LLM calls, total cost |
+| `binary_metrics` | Precision and recall for yes/no detectors |
+
+### Measured: injection heuristic
+
+`packages/aicore/evals/injection.jsonl` holds 30 hand-written prompts:
+16 attacks (direct phrasing, Unicode disguise, indirect, paraphrase,
+role-play, Hindi, Hinglish, base64, spaced letters) and 14 benign
+prompts, 9 of which look suspicious. Measured on 2026-11-16:
+
+| Metric | Value |
+|---|---|
+| Precision (blocked prompts that were attacks) | 0.73 (8 of 11) |
+| Recall (attacks blocked) | 0.50 (8 of 16) |
+| False positives (benign prompts blocked) | 3 of 14 |
+| Latency p50 / p95 | 0.01 ms / 0.04 ms |
+
+- Every direct, Unicode-disguised and indirect attack is caught; every
+  paraphrase, Hindi, base64 and spaced-out attack gets through.
+- The false positives are innocent questions containing a trigger
+  phrase, for example "how do I show the system prompt path in Windows
+  cmd?".
+- The gate test asserts precision ≥ 0.72 and recall ≥ 0.50, so a change
+  that weakens the guard fails `pytest`.
+
+```powershell
+uv run pytest -m eval -s   # run the gate and print the full report
+```
+
+See [ADR 0007](../../docs/adr/0007-evaluation-harness.md) for the design
+and the full per-attack-type table.
+
 ## Latency and cost (measured)
 
 `scripts/measure_llm.py` sends the same short prompt ("In one sentence,
@@ -361,8 +448,8 @@ Reading the numbers:
 - At about 1.7 neurons per call, the free plan covers roughly 5,800 such
   calls per day.
 - This is a latency and cost comparison only. The two models differ 16×
-  in size, so answer quality is not compared here; that needs the
-  evaluation harness (M4).
+  in size, so answer quality is not compared here; that needs a task
+  dataset run through the evaluation harness.
 - Five calls is a small sample: use these numbers as an order of
   magnitude, not a benchmark.
 
@@ -439,6 +526,10 @@ reachable:
 uv run pytest -m integration -v
 ```
 
+Eval gate tests (`@pytest.mark.eval`) are offline and also run in the
+default `pytest` run; `uv run pytest -m eval -s` runs only them and
+prints their reports.
+
 ## Trade-offs and future work
 
 - Two real adapters: Ollama (local) and Cloudflare Workers AI (hosted).
@@ -458,11 +549,15 @@ uv run pytest -m integration -v
   no per-token price table yet; it arrives with the first token-billed
   provider.
 - The cache is exact-match only. A semantic cache (matching similar
-  prompts by embedding) is deferred until the evaluation harness (M4)
-  can measure how often it would return a wrong answer.
+  prompts by embedding) is deferred until a paraphrase dataset can
+  measure how often it would return a wrong answer.
 - Guardrails are regex-based. An NER (Named Entity Recognition) model or
-  Microsoft Presidio would catch names and addresses; an LLM-as-judge
-  injection check waits for the evaluation harness (M4) to measure it.
+  Microsoft Presidio would catch names and addresses. An LLM-as-judge
+  injection check can now be compared against the heuristic on
+  `injection.jsonl`.
+- The eval harness has no LLM-as-judge scorer, no per-case cost, no
+  baseline comparison and no CI (Continuous Integration) workflow yet;
+  see ADR 0007 for why each was deferred.
 - `CallRecord` does not yet name the guard that fired, and secrets in
   the *input* are not checked.
 - No cache stampede protection: two processes that miss at the same
@@ -479,4 +574,6 @@ uv run pytest -m integration -v
   cost tracking, and
   [ADR 0005](../../docs/adr/0005-response-caching.md) for response
   caching, and
-  [ADR 0006](../../docs/adr/0006-guardrails.md) for guardrails.
+  [ADR 0006](../../docs/adr/0006-guardrails.md) for guardrails, and
+  [ADR 0007](../../docs/adr/0007-evaluation-harness.md) for the
+  evaluation harness.
