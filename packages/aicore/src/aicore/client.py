@@ -1,9 +1,11 @@
-"""The single entry point for LLM calls in every project.
+"""The single entry point for model calls in every project.
 
 ``LLMClient`` wraps any ``LLMProvider`` and adds guardrails, caching,
 per-attempt timeouts and retries with exponential backoff and jitter,
 and tracing, so individual adapters stay small and behave the same
-across all backends.
+across all backends. Embedding and reranking share the same retry,
+timeout and tracing path through optional ``embedder`` and
+``reranker`` providers.
 """
 
 import asyncio
@@ -11,7 +13,8 @@ import json
 import logging
 import random
 import time
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from pydantic import BaseModel, ValidationError
@@ -19,6 +22,7 @@ from pydantic import BaseModel, ValidationError
 from aicore.cache import ResponseCache, cache_key
 from aicore.config import LLMSettings
 from aicore.errors import (
+    InvalidRequestError,
     ProviderTimeoutError,
     RateLimitError,
     RetryableError,
@@ -30,21 +34,40 @@ from aicore.guardrails import (
     apply_input_guards,
     apply_output_guards,
 )
-from aicore.models import LLMRequest, LLMResponse, Message, Usage
+from aicore.models import (
+    EmbedRequest,
+    EmbedResponse,
+    LLMRequest,
+    LLMResponse,
+    Message,
+    RerankRequest,
+    RerankResponse,
+    Usage,
+)
 from aicore.pricing import cost_usd
-from aicore.providers.base import LLMProvider
-from aicore.tracing import CallRecord, NullTracer, Tracer
+from aicore.providers.base import EmbeddingProvider, LLMProvider, RerankProvider
+from aicore.tracing import CallRecord, NullTracer, Operation, Tracer
 
 _log = logging.getLogger(__name__)
 
 
+@dataclass
+class _Attempts:
+    """Attempt counter shared with the retry loop.
+
+    Mutable so the caller can still read the count
+    (for tracing) after the loop raises.
+    """
+
+    count: int = 0
+
+
 class LLMClient:
-    """Provider-agnostic LLM client with timeouts and retries.
+    """Provider-agnostic model client with timeouts and retries.
 
     Only ``RetryableError`` failures are retried. Any other error (for example
     ``AuthenticationError``) is raised immediately, because sending the same
     request again cannot fix it.
-
     """
 
     def __init__(
@@ -58,6 +81,8 @@ class LLMClient:
         cache: ResponseCache | None = None,
         input_guards: Sequence[InputGuardrail] = (),
         output_guards: Sequence[OutputGuardrail] = (),
+        embedder: EmbeddingProvider | None = None,
+        reranker: RerankProvider | None = None,
     ) -> None:
         """Create a client around ``provider``.
 
@@ -76,6 +101,10 @@ class LLMClient:
                 provider; may redact the request or block it.
             output_guards: Run on every reply (including cache hits)
                 before it is cached or returned.
+            embedder: Backend for ``embed``. Often the same object
+                as ``provider``; ``None`` disables ``embed``.
+            reranker: Backend for ``rerank``. ``None`` disables
+                ``rerank`` (e.g. Ollama has no rerank endpoint).
         """
         self._provider = provider
         self._settings = settings or LLMSettings()
@@ -85,6 +114,8 @@ class LLMClient:
         self._cache = cache
         self._input_guards = tuple(input_guards)
         self._output_guards = tuple(output_guards)
+        self._embedder = embedder
+        self._reranker = reranker
 
     async def complete(self, request: LLMRequest) -> LLMResponse:
         """Send ``request``, retrying transient failures with backoff.
@@ -108,7 +139,7 @@ class LLMClient:
 
         started_at = datetime.now(UTC)
         start = time.perf_counter()
-        attempts = 0
+        attempts = _Attempts()
         response: LLMResponse | None = None
         outcome = "ok"
         cached = False
@@ -120,15 +151,10 @@ class LLMClient:
             if key is not None:
                 response = await self._cache_get(key)
                 cached = response is not None
-            while response is None:
-                attempts += 1
-                try:
-                    response = await self._call_once(request)
-                except RetryableError as err:
-                    if attempts > self._settings.max_retries:
-                        raise  # out of retries: surface the last error
-                    delay = self._backoff_delay(attempts - 1, err)
-                    await asyncio.sleep(delay)
+            if response is None:
+                response = await self._with_retries(
+                    lambda: self._provider.complete(request), attempts
+                )
             # Also on hits: guards may have changed since the write.
             apply_output_guards(self._output_guards, request, response)
             if key is not None and not cached:
@@ -139,14 +165,59 @@ class LLMClient:
             raise
         finally:
             self._trace(
-                request,
-                response,
+                "complete",
+                self._provider.name,
+                response.model if response else request.model,
+                response.usage if response else None,
                 started_at,
                 start,
-                attempts,
+                attempts.count,
                 outcome,
                 cached,
             )
+
+    async def embed(self, request: EmbedRequest) -> EmbedResponse:
+        """Embed ``request.texts`` with timeouts, retries and tracing.
+
+        ``request.model`` falls back to ``settings.embed_model``.
+        Guards and the response cache do not apply. Sends exactly
+        one ``CallRecord`` with ``operation="embed"``.
+
+        Raises:
+            InvalidRequestError: If the client has no ``embedder``.
+            RetryableError: If every attempt failed with a transient error.
+            NonRetryableError: On the first permanent failure.
+        """
+        embedder = self._embedder
+        if embedder is None:
+            msg = "LLMClient was created without an embedder"
+            raise InvalidRequestError(msg)
+        if request.model is None:
+            request = request.model_copy(update={"model": self._settings.embed_model})
+        return await self._run_traced(
+            "embed", embedder.name, request.model, lambda: embedder.embed(request)
+        )
+
+    async def rerank(self, request: RerankRequest) -> RerankResponse:
+        """Rerank documents with timeouts, retries and tracing.
+
+        ``request.model`` falls back to ``settings.rerank_model``.
+        Sends exactly one ``CallRecord`` with ``operation="rerank"``.
+
+        Raises:
+            InvalidRequestError: If the client has no ``reranker``.
+            RetryableError: If every attempt failed with a transient error.
+            NonRetryableError: On the first permanent failure.
+        """
+        reranker = self._reranker
+        if reranker is None:
+            msg = "LLMClient was created without a reranker"
+            raise InvalidRequestError(msg)
+        if request.model is None:
+            request = request.model_copy(update={"model": self._settings.rerank_model})
+        return await self._run_traced(
+            "rerank", reranker.name, request.model, lambda: reranker.rerank(request)
+        )
 
     async def complete_structured[T: BaseModel](self, request: LLMRequest, schema: type[T]) -> T:
         """Send ``request`` and parse the reply into an instance of ``schema``.
@@ -176,11 +247,60 @@ class LLMClient:
                 raw_text=response.text,
             ) from err
 
-    async def _call_once(self, request: LLMRequest) -> LLMResponse:
-        """Make one provider call, converting a timeout into ``ProviderTimeoutError``."""
+    async def _run_traced[R: (EmbedResponse, RerankResponse)](
+        self,
+        operation: Operation,
+        provider: str,
+        model: str | None,
+        call: Callable[[], Awaitable[R]],
+    ) -> R:
+        """Run ``call`` with retries and send exactly one ``CallRecord``."""
+        started_at = datetime.now(UTC)
+        start = time.perf_counter()
+        attempts = _Attempts()
+        response: R | None = None
+        outcome = "ok"
+        try:
+            response = await self._with_retries(call, attempts)
+            return response
+        except BaseException as err:
+            outcome = type(err).__name__
+            raise
+        finally:
+            self._trace(
+                operation,
+                provider,
+                response.model if response else model,
+                response.usage if response else None,
+                started_at,
+                start,
+                attempts.count,
+                outcome,
+                cached=False,
+            )
+
+    async def _with_retries[T](self, call: Callable[[], Awaitable[T]], attempts: _Attempts) -> T:
+        """Await ``call()`` with a timeout, retrying transient errors.
+
+        ``call`` is a factory, not a coroutine: a coroutine can be
+        awaited only once, so each attempt needs a fresh one.
+        ``attempts`` is updated in place so the caller can trace
+        the count even when every attempt fails.
+        """
+        while True:
+            attempts.count += 1
+            try:
+                return await self._with_timeout(call())
+            except RetryableError as err:
+                if attempts.count > self._settings.max_retries:
+                    raise  # out of retries: surface the last error
+                await asyncio.sleep(self._backoff_delay(attempts.count - 1, err))
+
+    async def _with_timeout[T](self, awaitable: Awaitable[T]) -> T:
+        """Await one provider call, converting a timeout into ``ProviderTimeoutError``."""
         timeout_s = self._settings.timeout_s
         try:
-            return await asyncio.wait_for(self._provider.complete(request), timeout=timeout_s)
+            return await asyncio.wait_for(awaitable, timeout=timeout_s)
         except TimeoutError as err:
             raise ProviderTimeoutError(f"provider did not respond within {timeout_s}s") from err
 
@@ -226,8 +346,10 @@ class LLMClient:
 
     def _trace(
         self,
-        request: LLMRequest,
-        response: LLMResponse | None,
+        operation: Operation,
+        provider: str,
+        model: str | None,
+        usage: Usage | None,
         started_at: datetime,
         start: float,
         attempts: int,
@@ -238,18 +360,15 @@ class LLMClient:
 
         Any error here is logged and swallowed:
         tracing must never break or change the
-        result of an LLM call.
+        result of a model call.
         """
         try:
-            latency_ms = (time.perf_counter() - start) * 1000
-            provider = self._provider.name
-            usage = response.usage if response else None
-            model = response.model if response else request.model
             rec = CallRecord(
+                operation=operation,
                 provider=provider,
                 model=model or "unknown",
                 started_at=started_at,
-                latency_ms=latency_ms,
+                latency_ms=(time.perf_counter() - start) * 1000,
                 attempts=attempts,
                 outcome=outcome,
                 cached=cached,

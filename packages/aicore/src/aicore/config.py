@@ -31,6 +31,8 @@ class LLMSettings(BaseSettings):
 
     provider: ProviderName = "fake"
     model: str = "fake-model"
+    embed_model: str = "fake-model"
+    rerank_model: str = "fake-model"
     api_key: SecretStr | None = None
     timeout_s: float = Field(default=30.0, gt=0)
     cache_ttl_s: int = Field(default=86_400, gt=0)

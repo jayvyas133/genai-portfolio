@@ -1,15 +1,20 @@
-"""Provider-agnostic request and response models for the LLM client.
+"""Provider-agnostic request and response models for aicore calls.
 
-Every provider adapter translates to and from these types, so project code
-never depends on a vendor SDK's objects. Swapping providers therefore never
-changes calling code.
+Covers chat completion, embedding and reranking. Every provider adapter
+translates to and from these types, so project code never depends on a vendor
+SDK's objects. Swapping providers therefore never changes calling code.
 """
 
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
 Role = Literal["system", "user", "assistant"]
+
+InputType = Literal["query", "document"]
+"""Which side of a retrieval pair a text is on (embedding models are asymmetric)."""
+
+NonEmptyStr = Annotated[str, Field(min_length=1)]
 
 
 class Message(BaseModel):
@@ -54,5 +59,61 @@ class LLMResponse(BaseModel):
     """The normalized result of one LLM call, whatever the provider."""
 
     text: str
+    model: str
+    usage: Usage
+
+
+class EmbedRequest(BaseModel):
+    """A batch of texts to turn into vectors in one provider call.
+
+    ``input_type`` tells the adapter whether these are search queries or
+    documents, so it can apply the model-specific prefix (if any). ``model``
+    falls back to the configured embedding model when ``None``.
+    """
+
+    texts: list[NonEmptyStr] = Field(min_length=1)
+    input_type: InputType = "document"
+    model: str | None = None
+
+
+class EmbedResponse(BaseModel):
+    """Vectors for an ``EmbedRequest``, in the same order as its ``texts``.
+
+    Embedding calls have no generated output, so ``usage.output_tokens`` is 0.
+    """
+
+    vectors: list[list[float]]
+    model: str
+    usage: Usage
+
+    @property
+    def dimensions(self) -> int:
+        """Length of each vector (0 if the response holds no vectors)."""
+        return len(self.vectors[0]) if self.vectors else 0
+
+
+class RerankRequest(BaseModel):
+    """Score candidate documents by their relevance to one query.
+
+    ``top_n`` limits how many results come back; ``None`` returns all of them.
+    """
+
+    query: NonEmptyStr
+    documents: list[NonEmptyStr] = Field(min_length=1)
+    top_n: int | None = Field(default=None, gt=0)
+    model: str | None = None
+
+
+class RerankResult(BaseModel):
+    """Relevance of one document, identified by its index in the request."""
+
+    index: int = Field(ge=0)
+    score: float
+
+
+class RerankResponse(BaseModel):
+    """Rerank results sorted by ``score``, highest first."""
+
+    results: list[RerankResult]
     model: str
     usage: Usage

@@ -9,11 +9,14 @@ any backend (logs, Langfuse) can consume them.
 import logging
 import uuid
 from datetime import UTC, datetime
-from typing import Protocol
+from typing import Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from aicore.models import Usage
+
+Operation = Literal["complete", "embed", "rerank"]
+"""Which kind of model call a ``CallRecord`` describes."""
 
 
 def _new_call_id() -> str:
@@ -36,6 +39,7 @@ class CallRecord(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     call_id: str = Field(default_factory=_new_call_id)
+    operation: Operation = "complete"
     provider: str
     model: str
     started_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
