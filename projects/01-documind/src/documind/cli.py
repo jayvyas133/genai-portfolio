@@ -1,4 +1,4 @@
-"""Command line: ``documind init-db`` and ``documind ingest``.
+"""Command line: ``documind init-db``, ``documind ingest`` and ``documind eval``.
 
 Run with ``uv run documind <command>``. Settings come from environment
 variables or ``.env`` (``DOCUMIND_*`` for DocuMind, ``AICORE_*`` for the
@@ -10,6 +10,7 @@ import asyncio
 import logging
 import sys
 from collections.abc import Callable, Sequence
+from datetime import UTC, datetime
 
 import psycopg
 from aicore.config import LLMSettings
@@ -19,7 +20,10 @@ from aicore.tracing import LogTracer
 
 from documind.config import DocumindSettings
 from documind.corpus import load_documents
+from documind.evaluate import EvalRun, evaluate_retrieval, format_run
+from documind.golden import Split, load_golden
 from documind.pipeline import DimensionMismatchError, ingest
+from documind.retrieval import DenseRetriever
 from documind.store import PgChunkStore, connect, init_db
 
 logger = logging.getLogger("documind")
@@ -52,6 +56,35 @@ async def run_ingest(settings: DocumindSettings, llm_settings: LLMSettings) -> N
     print(f"Store holds {stats.documents} documents and {stats.chunks} chunks.")
 
 
+async def run_eval(
+    settings: DocumindSettings, llm_settings: LLMSettings, split: Split | None, k: int
+) -> None:
+    """Score dense retrieval on the golden ``split``, print the table and save JSON."""
+    cases = load_golden(settings.evals_dir / "golden.jsonl", split)
+    client = build_client(llm_settings)
+    try:
+        async with await connect(settings.database_url) as conn:
+            retriever = DenseRetriever(PgChunkStore(conn), client, settings.embedding_dimensions)
+            report, skipped = await evaluate_retrieval(cases, retriever, k)
+    finally:
+        await client.aclose()
+    run = EvalRun(
+        retriever="dense",
+        split=split,
+        k=k,
+        embed_model=llm_settings.embed_model,
+        chunk_words=settings.chunk_words,
+        chunk_overlap_words=settings.chunk_overlap_words,
+        created_at=datetime.now(UTC),
+        skipped_unanswerable=skipped,
+        report=report,
+    )
+    path = run.save(settings.evals_dir / "results")
+    print(format_run(run))
+    print()
+    print(f"Saved {path}")
+
+
 def _loop_factory() -> Callable[[], asyncio.AbstractEventLoop] | None:
     """Return a selector loop on Windows; psycopg async cannot use Proactor."""
     return asyncio.SelectorEventLoop if sys.platform == "win32" else None
@@ -63,6 +96,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("init-db", help="Create the database and schema (safe to re-run).")
     commands.add_parser("ingest", help="Chunk, embed and store data/raw/*.json.")
+    eval_cmd = commands.add_parser("eval", help="Score retrieval on the golden dataset.")
+    eval_cmd.add_argument(
+        "--split", choices=["dev", "test", "all"], default="dev", help="default: dev"
+    )
+    eval_cmd.add_argument("--k", type=int, default=10, help="chunks to retrieve (default: 10)")
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -71,9 +109,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         settings = DocumindSettings()
         if args.command == "init-db":
-            asyncio.run(run_init_db(settings), loop_factory=_loop_factory())
+            coro = run_init_db(settings)
+        elif args.command == "ingest":
+            coro = run_ingest(settings, LLMSettings())
         else:
-            asyncio.run(run_ingest(settings, LLMSettings()), loop_factory=_loop_factory())
+            split = None if args.split == "all" else args.split
+            coro = run_eval(settings, LLMSettings(), split, args.k)
+        asyncio.run(coro, loop_factory=_loop_factory())
     except psycopg.OperationalError as exc:
         logger.error("Postgres not reachable (%s); %s", exc, _POSTGRES_HINT)
         return 1

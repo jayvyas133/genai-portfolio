@@ -18,7 +18,7 @@ from pgvector import Vector
 from pgvector.psycopg import register_vector_async
 from psycopg import sql
 from psycopg.conninfo import conninfo_to_dict, make_conninfo
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from documind.chunking import Chunk
 from documind.corpus import Document
@@ -55,11 +55,31 @@ CREATE INDEX IF NOT EXISTS chunks_content_hash ON chunks (content_hash);
 """
 
 
+# pgvector's HNSW search returns at most ``hnsw.ef_search`` rows (default 40).
+_DEFAULT_EF_SEARCH = 40
+
+
 class StoreStats(BaseModel):
     """Row counts, for CLI output and the README."""
 
     documents: int
     chunks: int
+
+
+class RetrievedChunk(BaseModel):
+    """One search result, with where it came from and how well it matched.
+
+    ``score`` is higher-is-better; for dense search it is cosine
+    similarity (1 - cosine distance), between -1 and 1.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    chunk_id: int
+    document_title: str
+    section: str
+    text: str
+    score: float
 
 
 def _database_name(database_url: str) -> str:
@@ -174,6 +194,39 @@ class PgChunkStore:
                         for c, e in zip(chunks, embeddings, strict=True)
                     ],
                 )
+
+    async def search_dense(self, vector: Sequence[float], k: int) -> list[RetrievedChunk]:
+        """Return the ``k`` chunks closest to ``vector`` by cosine distance.
+
+        Uses the HNSW (Hierarchical Navigable Small World) index, which is
+        approximate. HNSW returns at most ``hnsw.ef_search`` rows, so for
+        ``k`` above the default 40 it is raised for this query only
+        (``SET LOCAL`` inside a transaction).
+
+        Raises:
+            ValueError: If ``k`` < 1.
+        """
+        if k < 1:
+            msg = f"k must be at least 1, got {k}"
+            raise ValueError(msg)
+        async with self._conn.transaction():
+            if k > _DEFAULT_EF_SEARCH:
+                await self._conn.execute(
+                    sql.SQL("SET LOCAL hnsw.ef_search = {}").format(sql.Literal(k))
+                )
+            cur = await self._conn.execute(
+                "SELECT c.id, d.title, c.section, c.text, c.embedding <=> %s AS distance"
+                " FROM chunks c JOIN documents d ON d.id = c.document_id"
+                " ORDER BY distance LIMIT %s",
+                (Vector(list(vector)), k),
+            )
+            rows = await cur.fetchall()
+        return [
+            RetrievedChunk(
+                chunk_id=cid, document_title=title, section=section, text=text, score=1 - dist
+            )
+            for cid, title, section, text, dist in rows
+        ]
 
     async def stats(self) -> StoreStats:
         """Count documents and chunks."""

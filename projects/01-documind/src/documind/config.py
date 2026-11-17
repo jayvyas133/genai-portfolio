@@ -34,6 +34,8 @@ class DocumindSettings(BaseSettings):
 
     database_url: str = "postgresql://postgres:postgres@localhost:5432/documind"
     data_dir: Path = _PROJECT_ROOT / "data"
+    # Golden dataset (golden.jsonl) and saved eval results (results/).
+    evals_dir: Path = _PROJECT_ROOT / "evals"
     # 200 words keeps the densest chunk (~1.9 tokens/word) under BGE's 512-token limit.
     chunk_words: int = Field(default=200, gt=0)
     chunk_overlap_words: int = Field(default=40, ge=0)

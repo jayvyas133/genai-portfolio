@@ -88,3 +88,23 @@ def test_invalid_settings_are_a_friendly_error(
 
     assert cli.main(["init-db"]) == 1
     assert "chunk_overlap_words must be smaller" in caplog.text
+
+
+def test_eval_with_missing_golden_set_is_a_friendly_error(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """No ``evals/golden.jsonl`` exits 1 naming the file, before touching Postgres."""
+    monkeypatch.setenv("DOCUMIND_EVALS_DIR", str(tmp_path))
+    monkeypatch.setenv("DOCUMIND_DATABASE_URL", UNREACHABLE_DB)
+
+    assert cli.main(["eval"]) == 1
+    assert "golden.jsonl: cannot read dataset" in caplog.text
+
+
+def test_eval_rejects_an_unknown_split(capsys: pytest.CaptureFixture[str]) -> None:
+    """Only dev, test and all are valid splits."""
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["eval", "--split", "train"])
+
+    assert exc.value.code == 2
+    assert "invalid choice" in capsys.readouterr().err

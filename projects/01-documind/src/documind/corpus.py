@@ -1,8 +1,8 @@
 """Load the source documents that DocuMind answers questions about.
 
 The corpus is a folder of JSON files, one per document, each holding
-``title``, ``url`` and ``text``. Text uses MediaWiki-style
-``== Heading ==`` lines, which the chunker uses to split by section.
+``title``, ``url`` and ``text``. Text marks sections with
+``== Heading ==`` lines, which the chunker uses to split it.
 """
 
 from pathlib import Path

@@ -6,7 +6,7 @@ word windows that overlap, so a sentence cut at one window's edge still
 appears whole in the neighbouring chunk.
 
 Words stand in for tokens: BGE reads at most 512 tokens (about 370
-technical English words), so 300-word chunks fit without a tokenizer.
+technical English words). 200-word chunks fit without a tokenizer (ADR 0009).
 """
 
 import hashlib
@@ -88,7 +88,7 @@ def _raw_sections(text: str) -> Iterator[tuple[list[str], str]]:
 
 
 def split_sections(text: str) -> list[Section]:
-    """Split MediaWiki plain text into sections with heading paths.
+    """Split plain text into sections with heading paths.
 
     Sections with no body (a heading directly followed by a
     subheading) and boilerplate sections are left out.
