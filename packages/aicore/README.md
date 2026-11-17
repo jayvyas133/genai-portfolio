@@ -1,7 +1,8 @@
 # aicore
 
 Shared platform layer used by all five portfolio projects. Every LLM
-(Large Language Model) call in the portfolio goes through `aicore`, so
+(Large Language Model), embedding and reranker call in the portfolio
+goes through `aicore`, so
 reliability, tracing, cost tracking and caching are built once and behave
 the same everywhere.
 
@@ -18,6 +19,7 @@ the same everywhere.
 | M3 | Response caching (in-memory and Redis) | done |
 | M3.5 | Guardrails: PII redaction, input limits, injection and secret-leak checks | done |
 | M4 | Evaluation harness: datasets, scorers, runner, reports, eval gate | done |
+| M5 | Embeddings and reranking (for project 01, DocuMind) | done |
 
 ## Problem
 
@@ -46,6 +48,13 @@ flowchart LR
     CF -->|HTTPS| WA[(Cloudflare Workers AI)]
     O -->|HTTP| L[(Local Ollama server)]
     C -->|LLMResponse / Pydantic model| P
+    P -->|EmbedRequest / RerankRequest| C
+    C -->|embed, same retry loop| EP{{EmbeddingProvider protocol}}
+    C -->|rerank, same retry loop| RP{{RerankProvider protocol}}
+    EP --> F
+    EP --> CF
+    RP --> F
+    RP --> CF
     C -->|one CallRecord per call| T{{Tracer protocol}}
     PR[pricing.cost_usd] --> C
     T --> NT[NullTracer]
@@ -65,13 +74,21 @@ flowchart LR
 - **`LLMClient`** (`client.py`): the single entry point. It adds a timeout on
   every attempt, retries with exponential backoff and full jitter, and
   provides structured output.
+- **`EmbeddingProvider` / `RerankProvider`** (`providers/base.py`):
+  separate protocols, because not every backend offers every capability
+  (Ollama has no rerank endpoint). `LLMClient` takes them as optional
+  `embedder=` and `reranker=` arguments.
 - **`FakeProvider`** (`providers/fakeai.py`): a scripted, offline provider
-  for tests and local development. It records every request in `.calls`.
+  for tests and local development. It records every request in `.calls`
+  (and `.embed_calls`, `.rerank_calls`). It embeds with the hashing trick
+  (texts sharing words get similar vectors) and reranks by word overlap,
+  so retrieval tests run offline with meaningful rankings.
 - **`OllamaProvider`** (`providers/ollama.py`): calls a local Ollama
   server's `/api/chat` with `httpx` and maps HTTP (Hypertext Transfer
   Protocol) status codes and network failures onto aicore errors.
 - **`CloudflareProvider`** (`providers/cloudflare.py`): calls Workers
-  AI's native `/ai/run/{model}` endpoint with `httpx`. It reads
+  AI's native `/ai/run/{model}` endpoint with `httpx` for chat, embedding
+  (`@cf/baai/bge-base-en-v1.5`) and reranking (`@cf/baai/bge-reranker-base`). It reads
   Cloudflare's error codes as well as the status, so a used-up daily
   quota is not retried. The status mapping shared with Ollama lives in
   `providers/_http.py`.
@@ -156,6 +173,35 @@ and `AICORE_CLOUDFLARE_ACCOUNT_ID=<account id>`. The free plan allows
 10,000 neurons per day and stops (no charge) when they run out; it
 resets at 00:00 UTC (Coordinated Universal Time).
 
+### Embedding and reranking
+
+```python
+from aicore.client import LLMClient
+from aicore.models import EmbedRequest, RerankRequest
+from aicore.providers.cloudflare import CloudflareProvider
+
+provider = CloudflareProvider(account_id, api_token)
+client = LLMClient(provider, settings, embedder=provider, reranker=provider)
+
+docs = await client.embed(EmbedRequest(texts=chunks))  # input_type="document"
+query = await client.embed(EmbedRequest(texts=[question], input_type="query"))
+ranked = await client.rerank(RerankRequest(query=question, documents=chunks, top_n=5))
+best = [chunks[r.index] for r in ranked.results]  # highest score first
+```
+
+- **`input_type` states intent; the adapter adds the prefix.** BGE
+  (BAAI General Embedding) queries get "Represent this sentence for
+  searching relevant passages: "; documents get none.
+- **Results point back by `index`**, so the caller keeps its own chunk
+  metadata.
+- Embed and rerank share `complete()`'s timeout, retry and backoff
+  behaviour and send one trace record each. Guards and the response
+  cache do not apply to them.
+- A client built without `embedder=` (or `reranker=`) raises
+  `InvalidRequestError` when `embed()` (or `rerank()`) is called.
+- **Rerank scores are raw and uncalibrated** (0.049 vs 0.032 in a live
+  test). Use them to order results, not as a fixed threshold.
+
 ## Configuration
 
 Settings are read from environment variables (or a `.env` file) with the
@@ -165,6 +211,8 @@ prefix `AICORE_`. They are validated at startup.
 |---|---|---|
 | `AICORE_PROVIDER` | `fake` | Which adapter to use: `fake`, `ollama` or `cloudflare` |
 | `AICORE_MODEL` | `fake-model` | Model used when a request does not set one |
+| `AICORE_EMBED_MODEL` | `fake-model` | Embedding model when an `EmbedRequest` does not set one (Cloudflare: `@cf/baai/bge-base-en-v1.5`) |
+| `AICORE_RERANK_MODEL` | `fake-model` | Rerank model when a `RerankRequest` does not set one (Cloudflare: `@cf/baai/bge-reranker-base`) |
 | `AICORE_API_KEY` | unset | Provider key or token (Cloudflare API token), stored as a `SecretStr` so it is never printed |
 | `AICORE_TIMEOUT_S` | `30.0` | Timeout per attempt, in seconds |
 | `AICORE_MAX_RETRIES` | `3` | Retries after the first attempt (so 4 calls at most) |
@@ -216,6 +264,7 @@ INFO:aicore.trace:{"call_id":"5280bf...","provider":"fake","model":"fake-model",
 | Field | Meaning |
 |---|---|
 | `call_id` | Random ID, to match a log line to a trace later |
+| `operation` | `complete`, `embed` or `rerank` |
 | `provider` | Name reported by the provider object that served the call |
 | `model` | Model that actually served the call (Cloudflare may route to a variant) |
 | `started_at` | Start time, timezone-aware UTC |
@@ -236,6 +285,8 @@ Rules:
   Cloudflare costs neurons × USD 0.011 per 1,000 neurons, its paid-plan
   list price; the free plan's 10,000 neurons per day are not charged. A
   provider with no known price gets `null`, never `0`.
+- Cloudflare's embed and rerank endpoints report no neurons, so their
+  `cost_usd` is `null` (unknown), not `0`.
 - `complete_structured` is traced through `complete`. A reply that fails
   validation is still `outcome="ok"`, because the transport succeeded.
 
@@ -564,6 +615,9 @@ prints their reports.
   moment both call the provider.
 - Cached replies sit in Redis as plain text; prompts with personal or
   secret data need a short TTL or no cache.
+- Embeddings: no embedding cache, no batch splitting for Cloudflare's
+  per-call limit, no Ollama embedding adapter, and no cost estimate for
+  Cloudflare embed/rerank yet. See ADR 0008.
 - See [ADR 0001](../../docs/adr/0001-provider-interface.md) for why the
   client is built around a provider protocol, and
   [ADR 0002](../../docs/adr/0002-ollama-adapter-raw-httpx.md) for why the
@@ -576,4 +630,6 @@ prints their reports.
   caching, and
   [ADR 0006](../../docs/adr/0006-guardrails.md) for guardrails, and
   [ADR 0007](../../docs/adr/0007-evaluation-harness.md) for the
-  evaluation harness.
+  evaluation harness, and
+  [ADR 0008](../../docs/adr/0008-embeddings-and-reranking.md) for
+  embeddings and reranking.

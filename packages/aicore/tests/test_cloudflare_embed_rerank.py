@@ -9,6 +9,8 @@ from collections.abc import Callable
 
 import httpx
 import pytest
+from aicore.client import LLMClient
+from aicore.config import LLMSettings
 from aicore.errors import (
     InvalidRequestError,
     ProviderTimeoutError,
@@ -203,3 +205,37 @@ class TestRerank:
 
         with pytest.raises(InvalidRequestError, match="5006"):
             await provider.rerank(RerankRequest(query="q", documents=["d"], model=RERANK_MODEL))
+
+
+@pytest.mark.integration
+async def test_real_cloudflare_embed_and_rerank() -> None:
+    """Call the real Workers AI embedding and rerank models (a few neurons).
+
+    Confirms the request and response field names against the live API, and
+    that relevance points the right way. Skipped unless ``AICORE_API_KEY``
+    and ``AICORE_CLOUDFLARE_ACCOUNT_ID`` are set.
+    """
+    settings = LLMSettings(embed_model=EMBED_MODEL, rerank_model=RERANK_MODEL, max_retries=0)
+    if settings.api_key is None or not settings.cloudflare_account_id:
+        pytest.skip("Cloudflare credentials not set")
+
+    provider = CloudflareProvider(
+        settings.cloudflare_account_id, settings.api_key.get_secret_value()
+    )
+    client = LLMClient(provider, settings, embedder=provider, reranker=provider)
+    query = "How much memory does a GPU have?"
+    docs = [
+        "The H100 GPU ships with 80 GB of high-bandwidth memory.",
+        "Cricket is played between two teams of eleven players.",
+    ]
+    try:
+        q = await client.embed(EmbedRequest(texts=[query], input_type="query"))
+        d = await client.embed(EmbedRequest(texts=docs))
+        ranked = await client.rerank(RerankRequest(query=query, documents=docs))
+    finally:
+        await provider.aclose()
+
+    assert q.dimensions == d.dimensions == 768
+    sims = [sum(a * b for a, b in zip(q.vectors[0], v, strict=True)) for v in d.vectors]
+    assert sims[0] > sims[1]
+    assert [r.index for r in ranked.results] == [0, 1]
