@@ -34,8 +34,9 @@ class DocumindSettings(BaseSettings):
 
     database_url: str = "postgresql://postgres:postgres@localhost:5432/documind"
     data_dir: Path = _PROJECT_ROOT / "data"
-    chunk_words: int = Field(default=300, gt=0)
-    chunk_overlap_words: int = Field(default=50, ge=0)
+    # 200 words keeps the densest chunk (~1.9 tokens/word) under BGE's 512-token limit.
+    chunk_words: int = Field(default=200, gt=0)
+    chunk_overlap_words: int = Field(default=40, ge=0)
     embed_batch_size: int = Field(default=50, gt=0, le=100)
     embedding_dimensions: int = Field(default=768, gt=0)
 

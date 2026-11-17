@@ -6,11 +6,13 @@ so projects never import a concrete provider directly.
 
 from typing import assert_never
 
+from aicore.client import LLMClient
 from aicore.config import LLMSettings
 from aicore.providers.base import LLMProvider
 from aicore.providers.cloudflare import CloudflareProvider
 from aicore.providers.fakeai import FakeProvider
 from aicore.providers.ollama import OllamaProvider
+from aicore.tracing import Tracer
 
 
 def build_provider(settings: LLMSettings) -> LLMProvider:
@@ -20,8 +22,6 @@ def build_provider(settings: LLMSettings) -> LLMProvider:
         settings: Validated settings; ``provider`` picks the adapter.
 
     Returns:
-        A ready-to-use provider. ``OllamaProvider`` holds an HTTP
-        connection pool, so call its ``aclose`` when finished.
         A ready-to-use provider. HTTP-based providers
         hold a connection pool, so call their
         ``aclose`` when finished.
@@ -38,6 +38,31 @@ def build_provider(settings: LLMSettings) -> LLMProvider:
             return OllamaProvider(str(settings.ollama_base_url))
         case "cloudflare":
             return _build_cloudflare(settings)
+        case _:
+            assert_never(name)
+
+
+def build_client(settings: LLMSettings, *, tracer: Tracer | None = None) -> LLMClient:
+    """Build an ``LLMClient`` wired to the configured provider.
+
+    The one adapter also serves ``embed`` and ``rerank`` when it supports
+    them (Cloudflare and fake do; Ollama only chats). Call
+    ``await client.aclose()`` when finished.
+
+    Raises:
+        ValueError: If the chosen provider's required settings are missing.
+    """
+    name = settings.provider
+    match name:
+        case "fake":
+            fake = FakeProvider(model=settings.model)
+            return LLMClient(fake, settings, tracer=tracer, embedder=fake, reranker=fake)
+        case "cloudflare":
+            cf = _build_cloudflare(settings)
+            return LLMClient(cf, settings, tracer=tracer, embedder=cf, reranker=cf)
+        case "ollama":
+            ollama = OllamaProvider(str(settings.ollama_base_url))
+            return LLMClient(ollama, settings, tracer=tracer)
         case _:
             assert_never(name)
 

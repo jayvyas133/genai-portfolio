@@ -13,6 +13,9 @@ dependencies = [
     "pydantic-settings>=2.4",
 ]
 
+[project.scripts]
+documind = "documind.cli:main"
+
 [tool.uv.sources]
 aicore = { workspace = true }
 

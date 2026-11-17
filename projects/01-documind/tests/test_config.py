@@ -26,11 +26,11 @@ def load() -> DocumindSettings:
 
 
 def test_defaults() -> None:
-    """Defaults match the plan: local documind DB, 300/50 words, 768 dims."""
+    """Defaults match the plan: local documind DB, 200/40 words, 768 dims."""
     s = load()
 
     assert s.database_url.endswith("@localhost:5432/documind")
-    assert (s.chunk_words, s.chunk_overlap_words) == (300, 50)
+    assert (s.chunk_words, s.chunk_overlap_words) == (200, 40)
     assert s.embed_batch_size == 50
     assert s.embedding_dimensions == 768
 
@@ -63,7 +63,7 @@ def test_aicore_variables_are_ignored(monkeypatch: pytest.MonkeyPatch) -> None:
     """A shared ``.env`` holding ``AICORE_*`` values does not break loading."""
     monkeypatch.setenv("AICORE_PROVIDER", "cloudflare")
 
-    assert load().chunk_words == 300
+    assert load().chunk_words == 200
 
 
 @pytest.mark.parametrize("overlap", [300, 301])

@@ -117,6 +117,20 @@ class LLMClient:
         self._embedder = embedder
         self._reranker = reranker
 
+    async def aclose(self) -> None:
+        """Close every backend that holds a connection pool.
+
+        The same adapter often serves chat, embed and rerank, so each
+        distinct backend is closed once. Backends without ``aclose``
+        (like ``FakeProvider``) are skipped.
+        """
+        backends = (self._provider, self._embedder, self._reranker)
+        unique = {id(b): b for b in backends if b is not None}
+        for backend in unique.values():
+            close = getattr(backend, "aclose", None)
+            if close is not None:
+                await close()
+
     async def complete(self, request: LLMRequest) -> LLMResponse:
         """Send ``request``, retrying transient failures with backoff.
 
