@@ -71,10 +71,12 @@ class _EmbedResult(BaseModel):
 
     ``data`` holds one vector per input text, in
     input order. ``shape`` is ``[n_texts, dims]``.
+    ``usage`` reports input tokens (no neurons).
     """
 
     shape: list[int]
     data: list[list[float]]
+    usage: _CloudflareUsage = _CloudflareUsage()
 
 
 class _RerankItem(BaseModel):
@@ -184,8 +186,8 @@ class CloudflareProvider:
         """Embed ``request.texts`` in one Workers AI call.
 
         Queries get BGE's retrieval instruction prefix;
-        documents are sent as-is. The endpoint reports
-        no token usage, so ``usage`` is 0/0.
+        documents are sent as-is. Input tokens come from
+        ``result.usage``; output tokens are always 0.
 
         Raises:
             Same errors as ``complete``.
@@ -196,7 +198,11 @@ class CloudflareProvider:
         return EmbedResponse(
             vectors=result.data,
             model=model,
-            usage=Usage(input_tokens=0, output_tokens=0),
+            usage=Usage(
+                input_tokens=result.usage.prompt_tokens,
+                output_tokens=0,
+                neurons=result.usage.neurons,
+            ),
         )
 
     async def rerank(self, request: RerankRequest) -> RerankResponse:

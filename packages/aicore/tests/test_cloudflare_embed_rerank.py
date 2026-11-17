@@ -80,6 +80,21 @@ class TestEmbed:
         assert resp.model == EMBED_MODEL
         assert resp.usage.total_tokens == 0
 
+    async def test_reports_input_tokens_from_usage(self) -> None:
+        """``result.usage.prompt_tokens`` becomes ``input_tokens``."""
+        result = {
+            "shape": [1, 1],
+            "data": [[0.5]],
+            "usage": {"prompt_tokens": 10, "completion_tokens": 0, "total_tokens": 10},
+        }
+        provider, _ = recording(ok(result))
+
+        resp = await provider.embed(EmbedRequest(texts=["a"], model=EMBED_MODEL))
+
+        assert resp.usage.input_tokens == 10
+        assert resp.usage.output_tokens == 0
+        assert resp.usage.neurons is None
+
     async def test_queries_get_bge_prefix(self) -> None:
         """BGE queries carry the retrieval instruction."""
         provider, seen = recording(embed_ok([[0.1]]))
@@ -236,6 +251,7 @@ async def test_real_cloudflare_embed_and_rerank() -> None:
         await provider.aclose()
 
     assert q.dimensions == d.dimensions == 768
+    assert q.usage.input_tokens > 0
     sims = [sum(a * b for a, b in zip(q.vectors[0], v, strict=True)) for v in d.vectors]
     assert sims[0] > sims[1]
     assert [r.index for r in ranked.results] == [0, 1]
