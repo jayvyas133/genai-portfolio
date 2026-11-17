@@ -7,6 +7,10 @@ requires-python = ">=3.12"
 dependencies = [
     "aicore",
     "flask>=3.0",
+    "pgvector>=0.3",
+    "psycopg[binary]>=3.2",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.4",
 ]
 
 [tool.uv.sources]
