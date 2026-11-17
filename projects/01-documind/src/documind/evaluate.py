@@ -26,6 +26,7 @@ class EvalRun(BaseModel):
 
     ``skipped_unanswerable`` counts cases left out because they have no
     evidence to find (they are scored on refusal in M5).
+    ``rerank_model`` is set only for retrievers that rerank.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -34,6 +35,7 @@ class EvalRun(BaseModel):
     split: Split | None
     k: int = Field(gt=0)
     embed_model: str
+    rerank_model: str | None = None
     chunk_words: int
     chunk_overlap_words: int
     created_at: datetime
@@ -114,7 +116,7 @@ def format_run(run: EvalRun, ks: Sequence[int] = DEFAULT_KS) -> str:
         f"k: {run.k} | chunks: {run.chunk_words}/{run.chunk_overlap_words} words"
     )
     latency = (
-        f"Latency per query (embed + search): p50 {p50:.0f} ms, p95 {p95:.0f} ms"
+        f"Latency per query (full retrieval): p50 {p50:.0f} ms, p95 {p95:.0f} ms"
         if p50 is not None and p95 is not None
         else "Latency: not measured"
     )

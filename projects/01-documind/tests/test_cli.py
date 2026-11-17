@@ -101,6 +101,15 @@ def test_eval_with_missing_golden_set_is_a_friendly_error(
     assert "golden.jsonl: cannot read dataset" in caplog.text
 
 
+def test_eval_rejects_an_unknown_retriever(capsys: pytest.CaptureFixture[str]) -> None:
+    """``--retriever`` accepts only the names ``build_retriever`` knows."""
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["eval", "--retriever", "bm25"])
+
+    assert exc.value.code == 2
+    assert "invalid choice" in capsys.readouterr().err
+
+
 def test_eval_rejects_an_unknown_split(capsys: pytest.CaptureFixture[str]) -> None:
     """Only dev, test and all are valid splits."""
     with pytest.raises(SystemExit) as exc:

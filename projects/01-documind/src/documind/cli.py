@@ -23,7 +23,7 @@ from documind.corpus import load_documents
 from documind.evaluate import EvalRun, evaluate_retrieval, format_run
 from documind.golden import Split, load_golden
 from documind.pipeline import DimensionMismatchError, ingest
-from documind.retrieval import DenseRetriever
+from documind.retrieval import RETRIEVER_NAMES, RetrieverName, build_retriever
 from documind.store import PgChunkStore, connect, init_db
 
 logger = logging.getLogger("documind")
@@ -57,22 +57,29 @@ async def run_ingest(settings: DocumindSettings, llm_settings: LLMSettings) -> N
 
 
 async def run_eval(
-    settings: DocumindSettings, llm_settings: LLMSettings, split: Split | None, k: int
+    settings: DocumindSettings,
+    llm_settings: LLMSettings,
+    name: RetrieverName,
+    split: Split | None,
+    k: int,
 ) -> None:
-    """Score dense retrieval on the golden ``split``, print the table and save JSON."""
+    """Score retriever ``name`` on the golden ``split``, print the table and save JSON."""
     cases = load_golden(settings.evals_dir / "golden.jsonl", split)
     client = build_client(llm_settings)
     try:
         async with await connect(settings.database_url) as conn:
-            retriever = DenseRetriever(PgChunkStore(conn), client, settings.embedding_dimensions)
+            retriever = build_retriever(
+                name, PgChunkStore(conn), client, settings.embedding_dimensions
+            )
             report, skipped = await evaluate_retrieval(cases, retriever, k)
     finally:
         await client.aclose()
     run = EvalRun(
-        retriever="dense",
+        retriever=name,
         split=split,
         k=k,
         embed_model=llm_settings.embed_model,
+        rerank_model=llm_settings.rerank_model if name.endswith("-rerank") else None,
         chunk_words=settings.chunk_words,
         chunk_overlap_words=settings.chunk_overlap_words,
         created_at=datetime.now(UTC),
@@ -100,6 +107,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     eval_cmd.add_argument(
         "--split", choices=["dev", "test", "all"], default="dev", help="default: dev"
     )
+    eval_cmd.add_argument(
+        "--retriever",
+        choices=RETRIEVER_NAMES,
+        default="hybrid-rerank",
+        help="default: hybrid-rerank (chosen in M4, see ADR 0011)",
+    )
     eval_cmd.add_argument("--k", type=int, default=10, help="chunks to retrieve (default: 10)")
     args = parser.parse_args(argv)
 
@@ -114,7 +127,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             coro = run_ingest(settings, LLMSettings())
         else:
             split = None if args.split == "all" else args.split
-            coro = run_eval(settings, LLMSettings(), split, args.k)
+            coro = run_eval(settings, LLMSettings(), args.retriever, split, args.k)
         asyncio.run(coro, loop_factory=_loop_factory())
     except psycopg.OperationalError as exc:
         logger.error("Postgres not reachable (%s); %s", exc, _POSTGRES_HINT)

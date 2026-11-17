@@ -1,4 +1,4 @@
-"""Dense retrieval against real Postgres + pgvector, with an offline embedder.
+"""Dense and sparse retrieval against real Postgres + pgvector, offline embedder.
 
 Ingests a small corpus into ``documind_e2e`` (shared with the ingestion
 integration test; each test starts from empty tables), then searches it.
@@ -15,7 +15,7 @@ from aicore.providers.fakeai import FakeProvider
 from documind.config import DocumindSettings
 from documind.corpus import Document
 from documind.pipeline import ingest
-from documind.retrieval import DenseRetriever
+from documind.retrieval import DenseRetriever, SparseRetriever
 from documind.store import Connection, PgChunkStore, connect, init_db
 from psycopg.conninfo import make_conninfo
 
@@ -88,3 +88,34 @@ async def test_k_below_one_is_rejected(store: PgChunkStore) -> None:
     """A zero or negative k is a caller bug, not an empty result."""
     with pytest.raises(ValueError, match="k must be at least 1"):
         await store.search_dense([0.0] * DIMS, 0)
+
+
+async def test_sparse_ranks_the_chunk_with_most_query_words_first(store: PgChunkStore) -> None:
+    """Every chunk has "topic"; only Doc 07 also has "7", so it ranks first.
+
+    OR semantics: the other chunks still match on "topic" alone.
+    """
+    results = await SparseRetriever(store).retrieve("Which topic is 7?", 5)
+
+    assert len(results) == 5
+    assert results[0].document_title == "Doc 07"
+    assert results[0].score > results[1].score
+
+
+async def test_sparse_matches_word_forms(store: PgChunkStore) -> None:
+    """English stemming: the query word "FACT" matches "facts" in the chunks."""
+    results = await store.search_sparse("FACT", 3)
+
+    assert len(results) == 3
+
+
+async def test_sparse_returns_nothing_without_a_shared_word(store: PgChunkStore) -> None:
+    """No matching word, or only stop words: an empty list, not an error."""
+    assert await store.search_sparse("quantum chromodynamics", 5) == []
+    assert await store.search_sparse("what is the", 5) == []
+
+
+async def test_sparse_k_below_one_is_rejected(store: PgChunkStore) -> None:
+    """Same contract as dense search."""
+    with pytest.raises(ValueError, match="k must be at least 1"):
+        await store.search_sparse("topic", 0)

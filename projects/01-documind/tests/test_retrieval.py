@@ -1,4 +1,4 @@
-"""Unit tests for ``DenseRetriever`` with a stub index (no database)."""
+"""Unit tests for the retrievers with a stub index (no database)."""
 
 from collections.abc import Sequence
 
@@ -7,7 +7,14 @@ from aicore.client import LLMClient
 from aicore.config import LLMSettings
 from aicore.providers.fakeai import FakeProvider
 from documind.pipeline import DimensionMismatchError
-from documind.retrieval import DenseRetriever, Retriever
+from documind.retrieval import (
+    RETRIEVER_NAMES,
+    DenseRetriever,
+    Retriever,
+    RetrieverName,
+    SparseRetriever,
+    build_retriever,
+)
 from documind.store import RetrievedChunk
 
 DIMS = 8
@@ -20,10 +27,16 @@ class StubIndex:
     def __init__(self) -> None:
         """Start with no recorded searches."""
         self.searches: list[tuple[list[float], int]] = []
+        self.keyword_searches: list[tuple[str, int]] = []
 
     async def search_dense(self, vector: Sequence[float], k: int) -> list[RetrievedChunk]:
         """Record the call and return ``[RESULT]``."""
         self.searches.append((list(vector), k))
+        return [RESULT]
+
+    async def search_sparse(self, query: str, k: int) -> list[RetrievedChunk]:
+        """Record the call and return ``[RESULT]``."""
+        self.keyword_searches.append((query, k))
         return [RESULT]
 
 
@@ -55,8 +68,53 @@ async def test_wrong_vector_size_fails_before_searching() -> None:
     assert index.searches == []
 
 
-def test_dense_retriever_is_a_retriever() -> None:
-    """Static check that ``DenseRetriever`` satisfies the ``Retriever`` protocol."""
-    r: Retriever = retriever(StubIndex(), FakeProvider(dimensions=DIMS))
+async def test_sparse_passes_the_raw_question_to_the_index() -> None:
+    """No model call: the question text and k go straight to full-text search."""
+    index = StubIndex()
 
-    assert r is not None
+    results = await SparseRetriever(index).retrieve("When was CUDA released?", 5)
+
+    assert results == [RESULT]
+    assert index.keyword_searches == [("When was CUDA released?", 5)]
+
+
+@pytest.mark.parametrize(
+    ("name", "embeds", "keyword_searches", "reranks"),
+    [
+        ("dense", 1, 0, 0),
+        ("sparse", 0, 1, 0),
+        ("hybrid", 1, 1, 0),
+        ("dense-rerank", 1, 0, 1),
+        ("hybrid-rerank", 1, 1, 1),
+    ],
+)
+async def test_build_retriever_wires_each_name(
+    name: RetrieverName, embeds: int, keyword_searches: int, reranks: int
+) -> None:
+    """Each name calls exactly the searches and models it promises."""
+    fake, index = FakeProvider(dimensions=DIMS), StubIndex()
+    client = LLMClient(
+        fake, LLMSettings(_env_file=None), base_delay_s=0, embedder=fake, reranker=fake
+    )
+
+    results = await build_retriever(name, index, client, DIMS).retrieve("CUDA", 1)
+
+    assert [r.chunk_id for r in results] == [RESULT.chunk_id]
+    assert len(fake.embed_calls) == len(index.searches) == embeds
+    assert len(index.keyword_searches) == keyword_searches
+    assert len(fake.rerank_calls) == reranks
+
+
+def test_every_retriever_name_is_covered() -> None:
+    """A new name added to ``RetrieverName`` must be added to the test above."""
+    assert RETRIEVER_NAMES == ("dense", "sparse", "hybrid", "dense-rerank", "hybrid-rerank")
+
+
+def test_retrievers_satisfy_the_protocol() -> None:
+    """Static check that every retriever satisfies ``Retriever``."""
+    retrievers: list[Retriever] = [
+        retriever(StubIndex(), FakeProvider(dimensions=DIMS)),
+        SparseRetriever(StubIndex()),
+    ]
+
+    assert len(retrievers) == 2

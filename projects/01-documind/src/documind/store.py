@@ -20,7 +20,7 @@ from psycopg import sql
 from psycopg.conninfo import conninfo_to_dict, make_conninfo
 from pydantic import BaseModel, ConfigDict
 
-from documind.chunking import Chunk
+from documind.chunking import Chunk, with_header
 from documind.corpus import Document
 
 Connection = psycopg.AsyncConnection[tuple[Any, ...]]
@@ -58,6 +58,15 @@ CREATE INDEX IF NOT EXISTS chunks_content_hash ON chunks (content_hash);
 # pgvector's HNSW search returns at most ``hnsw.ef_search`` rows (default 40).
 _DEFAULT_EF_SEARCH = 40
 
+# Turn a question into an OR full-text query. plainto_tsquery stems the
+# words and drops stop words, but joins them with AND, so a chunk would
+# need every word of the question. Swapping '&' for '|' keeps any chunk
+# with at least one word; ts_rank_cd then ranks chunks with more of them,
+# close together, higher. The lexemes are already stemmed, so they are
+# re-parsed with the 'simple' configuration (lower-case only). A question
+# of only stop words gives an empty query, which matches nothing.
+_OR_QUERY = "to_tsquery('simple', replace(plainto_tsquery('english', %s)::text, ' & ', ' | '))"
+
 
 class StoreStats(BaseModel):
     """Row counts, for CLI output and the README."""
@@ -69,8 +78,12 @@ class StoreStats(BaseModel):
 class RetrievedChunk(BaseModel):
     """One search result, with where it came from and how well it matched.
 
-    ``score`` is higher-is-better; for dense search it is cosine
-    similarity (1 - cosine distance), between -1 and 1.
+    ``score`` is higher-is-better, but its scale depends on the search:
+    cosine similarity (1 - cosine distance, -1 to 1) for dense search,
+    ``ts_rank_cd`` (0 upwards, unbounded) for sparse search, the fused
+    RRF (Reciprocal Rank Fusion) score for hybrid search, the reranker's
+    relevance score after reranking. Compare scores only within one
+    result list.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -80,6 +93,11 @@ class RetrievedChunk(BaseModel):
     section: str
     text: str
     score: float
+
+    @property
+    def embed_text(self) -> str:
+        """The text with its ``Title > Section`` header, as it was embedded."""
+        return with_header(self.document_title, self.section, self.text)
 
 
 def _database_name(database_url: str) -> str:
@@ -226,6 +244,36 @@ class PgChunkStore:
                 chunk_id=cid, document_title=title, section=section, text=text, score=1 - dist
             )
             for cid, title, section, text, dist in rows
+        ]
+
+    async def search_sparse(self, query: str, k: int) -> list[RetrievedChunk]:
+        """Return up to ``k`` chunks matching any word of ``query``, best first.
+
+        Full-text search over the ``tsv`` column (section path and text,
+        English stemming) with the GIN index. Ranked by ``ts_rank_cd``
+        (cover density: more query words, closer together, rank higher);
+        ties are broken by chunk id so results are repeatable. Returns
+        fewer than ``k`` chunks, or none, when fewer match.
+
+        Raises:
+            ValueError: If ``k`` < 1.
+        """
+        if k < 1:
+            msg = f"k must be at least 1, got {k}"
+            raise ValueError(msg)
+        cur = await self._conn.execute(
+            "SELECT c.id, d.title, c.section, c.text, ts_rank_cd(c.tsv, q.query) AS rank"
+            " FROM chunks c JOIN documents d ON d.id = c.document_id,"
+            f" {_OR_QUERY} AS q(query)"
+            " WHERE c.tsv @@ q.query"
+            " ORDER BY rank DESC, c.id LIMIT %s",
+            (query, k),
+        )
+        return [
+            RetrievedChunk(
+                chunk_id=cid, document_title=title, section=section, text=text, score=rank
+            )
+            for cid, title, section, text, rank in await cur.fetchall()
         ]
 
     async def stats(self) -> StoreStats:

@@ -45,6 +45,16 @@ class Section:
     text: str
 
 
+def with_header(title: str, section: str, text: str) -> str:
+    """Prefix ``text`` with a ``Title > Section`` line.
+
+    The one place this format is defined: chunks are embedded with it and
+    reranked with it, so both models see the same context. Changing it
+    changes every content hash, so every chunk would be re-embedded.
+    """
+    return f"{title} > {section}\n{text}"
+
+
 class Chunk(BaseModel):
     """One retrievable piece of a document.
 
@@ -63,7 +73,7 @@ class Chunk(BaseModel):
     @property
     def embed_text(self) -> str:
         """The text with a ``Title > Section`` header for context."""
-        return f"{self.document_title} > {self.section}\n{self.text}"
+        return with_header(self.document_title, self.section, self.text)
 
     @property
     def content_hash(self) -> str:

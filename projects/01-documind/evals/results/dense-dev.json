@@ -3,9 +3,10 @@
   "split": "dev",
   "k": 10,
   "embed_model": "@cf/baai/bge-base-en-v1.5",
+  "rerank_model": null,
   "chunk_words": 200,
   "chunk_overlap_words": 40,
-  "created_at": "2026-11-17T11:19:04.233309Z",
+  "created_at": "2026-11-17T12:26:32.832326Z",
   "skipped_unanswerable": 4,
   "report": {
     "cases": [
@@ -16,7 +17,7 @@
         "evidence_ranks": [
           1
         ],
-        "latency_ms": 429.8261000076309,
+        "latency_ms": 595.2086999895982,
         "first_rank": 1
       },
       {
@@ -26,7 +27,7 @@
         "evidence_ranks": [
           1
         ],
-        "latency_ms": 130.27069997042418,
+        "latency_ms": 158.23249996174127,
         "first_rank": 1
       },
       {
@@ -37,7 +38,7 @@
           4,
           4
         ],
-        "latency_ms": 168.3634000364691,
+        "latency_ms": 195.37679996574298,
         "first_rank": 4
       },
       {
@@ -47,7 +48,7 @@
         "evidence_ranks": [
           2
         ],
-        "latency_ms": 148.31590000540018,
+        "latency_ms": 252.14799999957904,
         "first_rank": 2
       },
       {
@@ -57,7 +58,7 @@
         "evidence_ranks": [
           1
         ],
-        "latency_ms": 136.7513999575749,
+        "latency_ms": 192.26009998237714,
         "first_rank": 1
       },
       {
@@ -67,7 +68,7 @@
         "evidence_ranks": [
           2
         ],
-        "latency_ms": 304.4111999915913,
+        "latency_ms": 169.81300001498312,
         "first_rank": 2
       },
       {
@@ -77,7 +78,7 @@
         "evidence_ranks": [
           1
         ],
-        "latency_ms": 245.1734999776818,
+        "latency_ms": 215.17319994745776,
         "first_rank": 1
       },
       {
@@ -87,7 +88,7 @@
         "evidence_ranks": [
           1
         ],
-        "latency_ms": 124.80330001562834,
+        "latency_ms": 188.04520001867786,
         "first_rank": 1
       },
       {
@@ -97,7 +98,7 @@
         "evidence_ranks": [
           1
         ],
-        "latency_ms": 254.30889998096973,
+        "latency_ms": 316.539500025101,
         "first_rank": 1
       },
       {
@@ -107,7 +108,7 @@
         "evidence_ranks": [
           1
         ],
-        "latency_ms": 259.0370000107214,
+        "latency_ms": 193.33219999680296,
         "first_rank": 1
       },
       {
@@ -117,7 +118,7 @@
         "evidence_ranks": [
           1
         ],
-        "latency_ms": 232.4454999761656,
+        "latency_ms": 156.2366000143811,
         "first_rank": 1
       },
       {
@@ -127,7 +128,7 @@
         "evidence_ranks": [
           1
         ],
-        "latency_ms": 180.06980000063777,
+        "latency_ms": 540.1047000195831,
         "first_rank": 1
       },
       {
@@ -137,7 +138,7 @@
         "evidence_ranks": [
           1
         ],
-        "latency_ms": 160.96960002323613,
+        "latency_ms": 157.53100003348663,
         "first_rank": 1
       },
       {
@@ -147,7 +148,7 @@
         "evidence_ranks": [
           null
         ],
-        "latency_ms": 164.7952999919653,
+        "latency_ms": 148.4762000036426,
         "first_rank": null
       },
       {
@@ -157,7 +158,7 @@
         "evidence_ranks": [
           2
         ],
-        "latency_ms": 288.4124999982305,
+        "latency_ms": 281.03119996376336,
         "first_rank": 2
       },
       {
@@ -167,7 +168,7 @@
         "evidence_ranks": [
           1
         ],
-        "latency_ms": 295.93299998668954,
+        "latency_ms": 244.3910000147298,
         "first_rank": 1
       },
       {
@@ -177,7 +178,7 @@
         "evidence_ranks": [
           1
         ],
-        "latency_ms": 152.53099997062236,
+        "latency_ms": 187.9699999699369,
         "first_rank": 1
       },
       {
@@ -187,7 +188,7 @@
         "evidence_ranks": [
           4
         ],
-        "latency_ms": 169.89329998614267,
+        "latency_ms": 240.9646000014618,
         "first_rank": 4
       },
       {
@@ -197,7 +198,7 @@
         "evidence_ranks": [
           1
         ],
-        "latency_ms": 268.2848999975249,
+        "latency_ms": 134.4020999968052,
         "first_rank": 1
       },
       {
@@ -207,7 +208,7 @@
         "evidence_ranks": [
           1
         ],
-        "latency_ms": 141.26439997926354,
+        "latency_ms": 561.5171999670565,
         "first_rank": 1
       },
       {
@@ -217,7 +218,7 @@
         "evidence_ranks": [
           1
         ],
-        "latency_ms": 178.19570004940033,
+        "latency_ms": 272.9262000066228,
         "first_rank": 1
       },
       {
@@ -227,7 +228,7 @@
         "evidence_ranks": [
           1
         ],
-        "latency_ms": 240.8154999720864,
+        "latency_ms": 249.94780000997707,
         "first_rank": 1
       },
       {
@@ -237,7 +238,7 @@
         "evidence_ranks": [
           2
         ],
-        "latency_ms": 261.34329999331385,
+        "latency_ms": 188.00700001884252,
         "first_rank": 2
       },
       {
@@ -247,7 +248,7 @@
         "evidence_ranks": [
           1
         ],
-        "latency_ms": 166.95240000262856,
+        "latency_ms": 178.38890000712126,
         "first_rank": 1
       },
       {
@@ -257,7 +258,7 @@
         "evidence_ranks": [
           2
         ],
-        "latency_ms": 145.38880001055077,
+        "latency_ms": 256.6115000518039,
         "first_rank": 2
       },
       {
@@ -267,7 +268,7 @@
         "evidence_ranks": [
           1
         ],
-        "latency_ms": 161.42860002582893,
+        "latency_ms": 249.42720000399277,
         "first_rank": 1
       },
       {
@@ -277,7 +278,7 @@
         "evidence_ranks": [
           1
         ],
-        "latency_ms": 249.58040000637993,
+        "latency_ms": 450.16520004719496,
         "first_rank": 1
       },
       {
@@ -287,7 +288,7 @@
         "evidence_ranks": [
           1
         ],
-        "latency_ms": 166.96759994374588,
+        "latency_ms": 251.42019998747855,
         "first_rank": 1
       },
       {
@@ -297,7 +298,7 @@
         "evidence_ranks": [
           1
         ],
-        "latency_ms": 165.79069994622841,
+        "latency_ms": 193.88099998468533,
         "first_rank": 1
       },
       {
@@ -307,7 +308,7 @@
         "evidence_ranks": [
           1
         ],
-        "latency_ms": 200.80170000437647,
+        "latency_ms": 255.26159995933995,
         "first_rank": 1
       },
       {
@@ -318,7 +319,7 @@
           2,
           1
         ],
-        "latency_ms": 294.2100000218488,
+        "latency_ms": 284.29649997269735,
         "first_rank": 1
       },
       {
@@ -329,7 +330,7 @@
           6,
           1
         ],
-        "latency_ms": 161.33149998495355,
+        "latency_ms": 268.3635000139475,
         "first_rank": 1
       },
       {
@@ -340,7 +341,7 @@
           2,
           10
         ],
-        "latency_ms": 253.93490004353225,
+        "latency_ms": 333.535399986431,
         "first_rank": 2
       },
       {
@@ -351,7 +352,7 @@
           2,
           4
         ],
-        "latency_ms": 271.2266000453383,
+        "latency_ms": 239.66620001010597,
         "first_rank": 2
       },
       {
@@ -362,7 +363,7 @@
           null,
           null
         ],
-        "latency_ms": 242.5795000162907,
+        "latency_ms": 202.63620000332594,
         "first_rank": null
       },
       {
@@ -373,7 +374,7 @@
           null,
           2
         ],
-        "latency_ms": 241.92289996426553,
+        "latency_ms": 168.63859997829422,
         "first_rank": 2
       }
     ]

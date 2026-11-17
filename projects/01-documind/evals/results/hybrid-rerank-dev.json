@@ -1,0 +1,382 @@
+{
+  "retriever": "hybrid-rerank",
+  "split": "dev",
+  "k": 10,
+  "embed_model": "@cf/baai/bge-base-en-v1.5",
+  "rerank_model": "@cf/baai/bge-reranker-base",
+  "chunk_words": 200,
+  "chunk_overlap_words": 40,
+  "created_at": "2026-11-17T12:28:00.916723Z",
+  "skipped_unanswerable": 4,
+  "report": {
+    "cases": [
+      {
+        "case_id": "amd-001",
+        "kind": "factual",
+        "retrieved": 10,
+        "evidence_ranks": [
+          1
+        ],
+        "latency_ms": 1029.4549000100233,
+        "first_rank": 1
+      },
+      {
+        "case_id": "amd-002",
+        "kind": "factual",
+        "retrieved": 10,
+        "evidence_ranks": [
+          1
+        ],
+        "latency_ms": 1289.4254999700934,
+        "first_rank": 1
+      },
+      {
+        "case_id": "ampere-001",
+        "kind": "factual",
+        "retrieved": 10,
+        "evidence_ranks": [
+          1,
+          1
+        ],
+        "latency_ms": 842.9540999932215,
+        "first_rank": 1
+      },
+      {
+        "case_id": "blackwell-001",
+        "kind": "factual",
+        "retrieved": 10,
+        "evidence_ranks": [
+          1
+        ],
+        "latency_ms": 790.347300004214,
+        "first_rank": 1
+      },
+      {
+        "case_id": "cuda-001",
+        "kind": "factual",
+        "retrieved": 10,
+        "evidence_ranks": [
+          1
+        ],
+        "latency_ms": 685.9666999662295,
+        "first_rank": 1
+      },
+      {
+        "case_id": "cuda-002",
+        "kind": "factual",
+        "retrieved": 10,
+        "evidence_ranks": [
+          1
+        ],
+        "latency_ms": 1599.8611000250094,
+        "first_rank": 1
+      },
+      {
+        "case_id": "dlss-001",
+        "kind": "factual",
+        "retrieved": 10,
+        "evidence_ranks": [
+          1
+        ],
+        "latency_ms": 1298.9096000092104,
+        "first_rank": 1
+      },
+      {
+        "case_id": "dlss-002",
+        "kind": "factual",
+        "retrieved": 10,
+        "evidence_ranks": [
+          1
+        ],
+        "latency_ms": 921.8190999818034,
+        "first_rank": 1
+      },
+      {
+        "case_id": "directx-001",
+        "kind": "factual",
+        "retrieved": 10,
+        "evidence_ranks": [
+          1
+        ],
+        "latency_ms": 891.2012000218965,
+        "first_rank": 1
+      },
+      {
+        "case_id": "directx-002",
+        "kind": "factual",
+        "retrieved": 10,
+        "evidence_ranks": [
+          2
+        ],
+        "latency_ms": 1036.5586000261828,
+        "first_rank": 2
+      },
+      {
+        "case_id": "gddr6-001",
+        "kind": "factual",
+        "retrieved": 10,
+        "evidence_ranks": [
+          1
+        ],
+        "latency_ms": 765.1351999957114,
+        "first_rank": 1
+      },
+      {
+        "case_id": "geforce-001",
+        "kind": "factual",
+        "retrieved": 10,
+        "evidence_ranks": [
+          1
+        ],
+        "latency_ms": 1328.8067000103183,
+        "first_rank": 1
+      },
+      {
+        "case_id": "gpgpu-001",
+        "kind": "factual",
+        "retrieved": 10,
+        "evidence_ranks": [
+          1
+        ],
+        "latency_ms": 868.7252000090666,
+        "first_rank": 1
+      },
+      {
+        "case_id": "gpgpu-002",
+        "kind": "factual",
+        "retrieved": 10,
+        "evidence_ranks": [
+          1
+        ],
+        "latency_ms": 1056.5556000219658,
+        "first_rank": 1
+      },
+      {
+        "case_id": "card-001",
+        "kind": "factual",
+        "retrieved": 10,
+        "evidence_ranks": [
+          1
+        ],
+        "latency_ms": 1038.5342999943532,
+        "first_rank": 1
+      },
+      {
+        "case_id": "pipeline-001",
+        "kind": "factual",
+        "retrieved": 10,
+        "evidence_ranks": [
+          1
+        ],
+        "latency_ms": 888.2084999931976,
+        "first_rank": 1
+      },
+      {
+        "case_id": "gpu-001",
+        "kind": "factual",
+        "retrieved": 10,
+        "evidence_ranks": [
+          1
+        ],
+        "latency_ms": 676.1425000149757,
+        "first_rank": 1
+      },
+      {
+        "case_id": "hbm-001",
+        "kind": "factual",
+        "retrieved": 10,
+        "evidence_ranks": [
+          2
+        ],
+        "latency_ms": 1196.0851000039838,
+        "first_rank": 2
+      },
+      {
+        "case_id": "hopper-001",
+        "kind": "factual",
+        "retrieved": 10,
+        "evidence_ranks": [
+          1
+        ],
+        "latency_ms": 784.2701999470592,
+        "first_rank": 1
+      },
+      {
+        "case_id": "nvidia-001",
+        "kind": "factual",
+        "retrieved": 10,
+        "evidence_ranks": [
+          1
+        ],
+        "latency_ms": 918.7854999909177,
+        "first_rank": 1
+      },
+      {
+        "case_id": "nvlink-001",
+        "kind": "factual",
+        "retrieved": 10,
+        "evidence_ranks": [
+          1
+        ],
+        "latency_ms": 625.0050000380725,
+        "first_rank": 1
+      },
+      {
+        "case_id": "opencl-001",
+        "kind": "factual",
+        "retrieved": 10,
+        "evidence_ranks": [
+          1
+        ],
+        "latency_ms": 855.3155999979936,
+        "first_rank": 1
+      },
+      {
+        "case_id": "opengl-001",
+        "kind": "factual",
+        "retrieved": 10,
+        "evidence_ranks": [
+          1
+        ],
+        "latency_ms": 1124.992299999576,
+        "first_rank": 1
+      },
+      {
+        "case_id": "pcie-001",
+        "kind": "factual",
+        "retrieved": 10,
+        "evidence_ranks": [
+          1
+        ],
+        "latency_ms": 940.1388000114821,
+        "first_rank": 1
+      },
+      {
+        "case_id": "radeon-001",
+        "kind": "factual",
+        "retrieved": 10,
+        "evidence_ranks": [
+          2
+        ],
+        "latency_ms": 1709.7873000311665,
+        "first_rank": 2
+      },
+      {
+        "case_id": "raytracing-001",
+        "kind": "factual",
+        "retrieved": 10,
+        "evidence_ranks": [
+          1
+        ],
+        "latency_ms": 1235.1218000403605,
+        "first_rank": 1
+      },
+      {
+        "case_id": "rocm-001",
+        "kind": "factual",
+        "retrieved": 10,
+        "evidence_ranks": [
+          1
+        ],
+        "latency_ms": 1186.2912999931723,
+        "first_rank": 1
+      },
+      {
+        "case_id": "shader-001",
+        "kind": "factual",
+        "retrieved": 10,
+        "evidence_ranks": [
+          1
+        ],
+        "latency_ms": 987.5737000256777,
+        "first_rank": 1
+      },
+      {
+        "case_id": "tpu-001",
+        "kind": "factual",
+        "retrieved": 10,
+        "evidence_ranks": [
+          1
+        ],
+        "latency_ms": 592.160000000149,
+        "first_rank": 1
+      },
+      {
+        "case_id": "vulkan-001",
+        "kind": "factual",
+        "retrieved": 10,
+        "evidence_ranks": [
+          1
+        ],
+        "latency_ms": 1155.269600043539,
+        "first_rank": 1
+      },
+      {
+        "case_id": "multi-001",
+        "kind": "multi-hop",
+        "retrieved": 10,
+        "evidence_ranks": [
+          3,
+          1
+        ],
+        "latency_ms": 878.7765000015497,
+        "first_rank": 1
+      },
+      {
+        "case_id": "multi-002",
+        "kind": "multi-hop",
+        "retrieved": 10,
+        "evidence_ranks": [
+          3,
+          1
+        ],
+        "latency_ms": 1025.440500001423,
+        "first_rank": 1
+      },
+      {
+        "case_id": "multi-003",
+        "kind": "multi-hop",
+        "retrieved": 10,
+        "evidence_ranks": [
+          1,
+          9
+        ],
+        "latency_ms": 839.3182999570854,
+        "first_rank": 1
+      },
+      {
+        "case_id": "multi-004",
+        "kind": "multi-hop",
+        "retrieved": 10,
+        "evidence_ranks": [
+          1,
+          null
+        ],
+        "latency_ms": 791.0950999939814,
+        "first_rank": 1
+      },
+      {
+        "case_id": "multi-005",
+        "kind": "multi-hop",
+        "retrieved": 10,
+        "evidence_ranks": [
+          2,
+          null
+        ],
+        "latency_ms": 725.1167999929748,
+        "first_rank": 2
+      },
+      {
+        "case_id": "multi-006",
+        "kind": "multi-hop",
+        "retrieved": 10,
+        "evidence_ranks": [
+          null,
+          1
+        ],
+        "latency_ms": 1073.7695000134408,
+        "first_rank": 1
+      }
+    ]
+  }
+}
