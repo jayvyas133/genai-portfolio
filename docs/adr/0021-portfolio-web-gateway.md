@@ -53,3 +53,25 @@ JavaScript.
   a Deep Research job streamed 9 events live and finished in 18 s.
 - **DocuMind needs the Cloudflare embedding model** its index was built
   with, so the page needs `.env`'s Cloudflare provider, not Ollama.
+
+## Addendum (2026-11-18): a React version alongside the plain page
+
+Jay asked for a React version as well, to show the skill, while keeping
+the plain page.
+
+- `web/react/`: Vite + React 19 + TypeScript (strict), written by hand
+  (no scaffolder): 3 tab components, a typed API module mirroring the
+  Pydantic response models, and the plain page's stylesheet, shared. 24
+  npm packages; the build is 71 KB gzipped.
+- Served by the same gateway at `/react/` (single-page-app fallback to
+  its `index.html`); the plain page stays at `/`. Same API calls, same
+  safety: React escapes text by default, as `textContent` does.
+- `web/Dockerfile` is multi-stage: a Node stage runs `npm ci` and
+  `npm run build` (type check, then bundle); the final image is plain
+  nginx with both pages and no Node. The `web` compose service now builds
+  this image instead of mounting files.
+- `npm run dev` gives hot reload, proxying `/api` to the running gateway.
+
+Trade-off: a Node toolchain and a build step to maintain, which the plain
+page avoids. Tabs stay mounted when hidden, so each keeps its state
+(a running research stream, the chat thread) when switching.

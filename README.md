@@ -20,8 +20,12 @@ to the three APIs (ADR 0021).
 ```bash
 cp .env.example .env    # set AICORE_* (DocuMind needs the Cloudflare embedding model)
 docker compose -f infra/docker-compose.yml up web
-# open http://localhost:8080
+# open http://localhost:8080          plain HTML + JavaScript, no build step
+# open http://localhost:8080/react/    the same page in React + TypeScript (web/react)
 ```
+
+React development with hot reload (the gateway must be running):
+`cd web/react && npm ci && npm run dev`, then open the URL Vite prints.
 
 ```mermaid
 flowchart LR
