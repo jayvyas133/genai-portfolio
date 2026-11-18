@@ -8,7 +8,14 @@ dependencies = [
     "aicore",
     "flask>=3.0",
     "langgraph>=0.2",
+    "psycopg[binary]>=3.2",
+    "pydantic>=2.8",
+    "pydantic-settings>=2.4",
+    "sqlglot>=30",
 ]
+
+[project.scripts]
+text-to-sql = "text_to_sql_agent.cli:main"
 
 [tool.uv.sources]
 aicore = { workspace = true }

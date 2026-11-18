@@ -1,0 +1,44 @@
+"""Configuration for the Text-to-SQL agent.
+
+Values come from environment variables prefixed with ``TEXT_TO_SQL_``
+(or a local ``.env`` file). Model choice and API keys are not here: they
+belong to aicore (``AICORE_*``), which makes every model call.
+"""
+
+from pathlib import Path
+
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# projects/03-text-to-sql-agent/ (this file is src/text_to_sql_agent/config.py).
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+
+class TextToSqlSettings(BaseSettings):
+    """Settings for the database, query limits and evals.
+
+    Example: ``TEXT_TO_SQL_MAX_ROWS=50`` sets ``max_rows`` to 50.
+    """
+
+    model_config = SettingsConfigDict(
+        env_prefix="TEXT_TO_SQL_",
+        env_file=".env",
+        extra="ignore",
+    )
+
+    # The agent's connection: the read-only role on the chinook database.
+    # `load-db` creates this role with the user and password given here.
+    database_url: str = "postgresql://sql_agent_ro:sql_agent_ro@localhost:5432/chinook"
+    # Owner connection used only by `load-db` to create the database and
+    # the role. Any existing database works (`postgres` always exists).
+    admin_database_url: str = "postgresql://postgres:postgres@localhost:5432/postgres"
+    # Vendored Chinook script (MIT licence, see data/chinook/LICENSE.md).
+    chinook_sql: Path = _PROJECT_ROOT / "data" / "chinook" / "Chinook_PostgreSql.sql"
+    # Golden dataset (golden.jsonl) and saved eval results (results/).
+    evals_dir: Path = _PROJECT_ROOT / "evals"
+    # Per-query cap enforced by Postgres. Chinook queries take milliseconds;
+    # this only stops runaway cross joins.
+    statement_timeout_ms: int = Field(default=10_000, gt=0)
+    # Rows returned to the caller; more are cut off and flagged truncated,
+    # so a huge result cannot flood the model's context or the API.
+    max_rows: int = Field(default=200, gt=0, le=10_000)

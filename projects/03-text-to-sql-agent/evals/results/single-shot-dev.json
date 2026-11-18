@@ -1,0 +1,504 @@
+{
+  "agent": "single-shot",
+  "model": "qwen2.5:3b",
+  "sql_prompt_version": "v1",
+  "split": "dev",
+  "created_at": "2026-11-18T08:47:19.066695Z",
+  "cases": [
+    {
+      "id": "s01",
+      "turns": [
+        {
+          "question": "How many tracks are in the database?",
+          "tags": [
+            "aggregate"
+          ],
+          "gold_sql": "SELECT count(*) AS tracks FROM track",
+          "sql": "SELECT COUNT(*) AS track_count\nFROM track;",
+          "correct": true,
+          "rows": 1,
+          "error_kind": null,
+          "error": null,
+          "latency_ms": 4824.191399966367,
+          "llm_calls": 1,
+          "cost_usd": 0.0
+        }
+      ]
+    },
+    {
+      "id": "c01",
+      "turns": [
+        {
+          "question": "What is the total revenue for each billing country? Show the country and the revenue.",
+          "tags": [
+            "aggregate"
+          ],
+          "gold_sql": "SELECT billing_country, sum(total) AS revenue FROM invoice GROUP BY billing_country",
+          "sql": "SELECT billing_country, SUM(unit_price * quantity) AS total_revenue\nFROM invoice_line\nJOIN invoice ON invoice_line.invoice_id = invoice.invoice_id\nJOIN customer ON invoice.customer_id = customer.customer_id\nGROUP BY billing_country",
+          "correct": true,
+          "rows": 24,
+          "error_kind": null,
+          "error": null,
+          "latency_ms": 10996.839900035411,
+          "llm_calls": 1,
+          "cost_usd": 0.0
+        },
+        {
+          "question": "Only for 2024.",
+          "tags": [
+            "follow-up",
+            "date"
+          ],
+          "gold_sql": "SELECT billing_country, sum(total) AS revenue FROM invoice WHERE invoice_date >= '2024-01-01' AND invoice_date < '2025-01-01' GROUP BY billing_country",
+          "sql": "SELECT \n    a.artist_id AS artist_id,\n    a.name AS artist_name,\n    g.name AS genre_name\nFROM \n    artist a\nJOIN \n    genre g ON a.artist_id = g.artist_id\nWHERE \n    a.artist_id = 2024;",
+          "correct": false,
+          "rows": null,
+          "error_kind": "execution",
+          "error": "column g.artist_id does not exist (SQLSTATE 42703)",
+          "latency_ms": 13246.611199981999,
+          "llm_calls": 1,
+          "cost_usd": 0.0
+        },
+        {
+          "question": "Now just the top 3 countries, highest first.",
+          "tags": [
+            "follow-up",
+            "order-limit"
+          ],
+          "gold_sql": "SELECT billing_country, sum(total) AS revenue FROM invoice WHERE invoice_date >= '2024-01-01' AND invoice_date < '2025-01-01' GROUP BY billing_country ORDER BY revenue DESC LIMIT 3",
+          "sql": "SELECT country, COUNT(*) as country_count\nFROM customer\nGROUP BY country\nORDER BY country_count DESC\nLIMIT 3;",
+          "correct": false,
+          "rows": 3,
+          "error_kind": null,
+          "error": null,
+          "latency_ms": 7307.117499993183,
+          "llm_calls": 1,
+          "cost_usd": 0.0
+        }
+      ]
+    },
+    {
+      "id": "s02",
+      "turns": [
+        {
+          "question": "List all genre names in alphabetical order.",
+          "tags": [
+            "order"
+          ],
+          "gold_sql": "SELECT name FROM genre ORDER BY name",
+          "sql": "SELECT name FROM genre ORDER BY name",
+          "correct": true,
+          "rows": 25,
+          "error_kind": null,
+          "error": null,
+          "latency_ms": 3577.1866000141017,
+          "llm_calls": 1,
+          "cost_usd": 0.0
+        }
+      ]
+    },
+    {
+      "id": "c02",
+      "turns": [
+        {
+          "question": "How many tracks are there in the Jazz genre?",
+          "tags": [
+            "join"
+          ],
+          "gold_sql": "SELECT count(*) AS tracks FROM track t JOIN genre g ON g.genre_id = t.genre_id WHERE g.name = 'Jazz'",
+          "sql": "SELECT COUNT(track_id) AS track_count\nFROM track\nJOIN genre ON track.genre_id = genre.genre_id\nWHERE genre.name = 'Jazz';",
+          "correct": true,
+          "rows": 1,
+          "error_kind": null,
+          "error": null,
+          "latency_ms": 8490.920300013386,
+          "llm_calls": 1,
+          "cost_usd": 0.0
+        },
+        {
+          "question": "What about Blues?",
+          "tags": [
+            "follow-up",
+            "ellipsis"
+          ],
+          "gold_sql": "SELECT count(*) AS tracks FROM track t JOIN genre g ON g.genre_id = t.genre_id WHERE g.name = 'Blues'",
+          "sql": "SELECT t.name, g.name AS genre_name\nFROM track t\nJOIN genre g ON t.genre_id = g.genre_id\nWHERE g.name = 'Blues';",
+          "correct": false,
+          "rows": 81,
+          "error_kind": null,
+          "error": null,
+          "latency_ms": 7466.99179999996,
+          "llm_calls": 1,
+          "cost_usd": 0.0
+        },
+        {
+          "question": "And what is their average unit price?",
+          "tags": [
+            "follow-up",
+            "reference"
+          ],
+          "gold_sql": "SELECT avg(t.unit_price) AS avg_price FROM track t JOIN genre g ON g.genre_id = t.genre_id WHERE g.name = 'Blues'",
+          "sql": "SELECT AVG(unit_price) AS average_unit_price\nFROM track;",
+          "correct": false,
+          "rows": 1,
+          "error_kind": null,
+          "error": null,
+          "latency_ms": 4470.539700007066,
+          "llm_calls": 1,
+          "cost_usd": 0.0
+        }
+      ]
+    },
+    {
+      "id": "s03",
+      "turns": [
+        {
+          "question": "Which customers live in Brazil? Give their first and last names.",
+          "tags": [
+            "filter"
+          ],
+          "gold_sql": "SELECT first_name, last_name FROM customer WHERE country = 'Brazil'",
+          "sql": "SELECT first_name, last_name\nFROM customer\nWHERE country = 'Brazil';",
+          "correct": true,
+          "rows": 5,
+          "error_kind": null,
+          "error": null,
+          "latency_ms": 5381.257600034587,
+          "llm_calls": 1,
+          "cost_usd": 0.0
+        }
+      ]
+    },
+    {
+      "id": "c03",
+      "turns": [
+        {
+          "question": "List the titles of the albums by Led Zeppelin.",
+          "tags": [
+            "join"
+          ],
+          "gold_sql": "SELECT a.title FROM album a JOIN artist r ON r.artist_id = a.artist_id WHERE r.name = 'Led Zeppelin'",
+          "sql": "SELECT a.title\nFROM album a\nJOIN artist ar ON a.artist_id = ar.artist_id\nWHERE ar.name = 'Led Zeppelin';",
+          "correct": true,
+          "rows": 14,
+          "error_kind": null,
+          "error": null,
+          "latency_ms": 7713.555900030769,
+          "llm_calls": 1,
+          "cost_usd": 0.0
+        },
+        {
+          "question": "How many tracks does each of them have? Show the title and the count.",
+          "tags": [
+            "follow-up",
+            "reference",
+            "aggregate"
+          ],
+          "gold_sql": "SELECT a.title, count(*) AS tracks FROM album a JOIN artist r ON r.artist_id = a.artist_id JOIN track t ON t.album_id = a.album_id WHERE r.name = 'Led Zeppelin' GROUP BY a.album_id, a.title",
+          "sql": "SELECT t.title, COUNT(*) as track_count\nFROM track t\nJOIN album a ON t.album_id = a.album_id\nGROUP BY t.title",
+          "correct": false,
+          "rows": null,
+          "error_kind": "execution",
+          "error": "column t.title does not exist (SQLSTATE 42703)",
+          "latency_ms": 8457.025000010617,
+          "llm_calls": 1,
+          "cost_usd": 0.0
+        },
+        {
+          "question": "Which of those albums is the longest in total running time?",
+          "tags": [
+            "follow-up",
+            "reference",
+            "order-limit"
+          ],
+          "gold_sql": "SELECT a.title FROM album a JOIN artist r ON r.artist_id = a.artist_id JOIN track t ON t.album_id = a.album_id WHERE r.name = 'Led Zeppelin' GROUP BY a.album_id, a.title ORDER BY sum(t.milliseconds) DESC LIMIT 1",
+          "sql": "SELECT title, album_id\nFROM album\nWHERE album_id = (\n    SELECT album_id\n    FROM track\n    JOIN album ON track.album_id = album.album_id\n    GROUP BY track.album_id\n    ORDER BY SUM(track.milliseconds) DESC\n    LIMIT 1\n)",
+          "correct": false,
+          "rows": null,
+          "error_kind": "execution",
+          "error": "column reference \"album_id\" is ambiguous (SQLSTATE 42702)",
+          "latency_ms": 12823.153999983333,
+          "llm_calls": 1,
+          "cost_usd": 0.0
+        }
+      ]
+    },
+    {
+      "id": "s04",
+      "turns": [
+        {
+          "question": "What is the total revenue from all invoices?",
+          "tags": [
+            "aggregate"
+          ],
+          "gold_sql": "SELECT sum(total) AS revenue FROM invoice",
+          "sql": "SELECT SUM(total) AS total_revenue\nFROM invoice;",
+          "correct": true,
+          "rows": 1,
+          "error_kind": null,
+          "error": null,
+          "latency_ms": 4572.025000001304,
+          "llm_calls": 1,
+          "cost_usd": 0.0
+        }
+      ]
+    },
+    {
+      "id": "c04",
+      "turns": [
+        {
+          "question": "Who is the top-spending customer from Canada? Give their first and last name.",
+          "tags": [
+            "join",
+            "order-limit"
+          ],
+          "gold_sql": "SELECT c.first_name, c.last_name FROM customer c JOIN invoice i ON i.customer_id = c.customer_id WHERE c.country = 'Canada' GROUP BY c.customer_id, c.first_name, c.last_name ORDER BY sum(i.total) DESC LIMIT 1",
+          "sql": "SELECT c.first_name, c.last_name\nFROM customer c\nJOIN (\n    SELECT customer_id, MAX(total) as max_total\n    FROM invoice\n    WHERE country = 'Canada'\n    GROUP BY customer_id\n) subq ON c.customer_id = subq.customer_id\nWHERE c.customer_id = subq.customer_id",
+          "correct": false,
+          "rows": null,
+          "error_kind": "execution",
+          "error": "column \"country\" does not exist (SQLSTATE 42703)",
+          "latency_ms": 14354.999199975282,
+          "llm_calls": 1,
+          "cost_usd": 0.0
+        },
+        {
+          "question": "List all of their invoices with the invoice date and total.",
+          "tags": [
+            "follow-up",
+            "reference"
+          ],
+          "gold_sql": "SELECT invoice_date, total FROM invoice WHERE customer_id = 3",
+          "sql": "SELECT invoice.invoice_id, invoice.invoice_date, invoice.total\nFROM invoice\nORDER BY invoice.invoice_date;",
+          "correct": false,
+          "rows": 200,
+          "error_kind": null,
+          "error": null,
+          "latency_ms": 5431.483599997591,
+          "llm_calls": 1,
+          "cost_usd": 0.0
+        },
+        {
+          "question": "Who is their support rep? Give the first and last name.",
+          "tags": [
+            "follow-up",
+            "reference",
+            "join"
+          ],
+          "gold_sql": "SELECT e.first_name, e.last_name FROM employee e JOIN customer c ON c.support_rep_id = e.employee_id WHERE c.customer_id = 3",
+          "sql": "SELECT first_name, last_name\nFROM employee\nWHERE employee_id = (SELECT support_rep_id FROM customer WHERE customer_id = <customer_id>)",
+          "correct": false,
+          "rows": null,
+          "error_kind": "unsafe",
+          "error": "The SQL does not parse: Required keyword: 'this' missing for <class 'sqlglot.expressions.core.LT'>. Line 3, Col: 90.",
+          "latency_ms": 7063.772900030017,
+          "llm_calls": 1,
+          "cost_usd": 0.0
+        }
+      ]
+    },
+    {
+      "id": "s05",
+      "turns": [
+        {
+          "question": "How many albums does AC/DC have?",
+          "tags": [
+            "join",
+            "aggregate"
+          ],
+          "gold_sql": "SELECT count(*) AS albums FROM album a JOIN artist r ON r.artist_id = a.artist_id WHERE r.name = 'AC/DC'",
+          "sql": "SELECT COUNT(album_id) AS num_albums\nFROM album\nJOIN artist ON album.artist_id = artist.artist_id\nWHERE artist.name = 'AC/DC';",
+          "correct": true,
+          "rows": 1,
+          "error_kind": null,
+          "error": null,
+          "latency_ms": 7603.619100002106,
+          "llm_calls": 1,
+          "cost_usd": 0.0
+        }
+      ]
+    },
+    {
+      "id": "c05",
+      "turns": [
+        {
+          "question": "How many customers are there in each country? Show the country and the count.",
+          "tags": [
+            "aggregate"
+          ],
+          "gold_sql": "SELECT country, count(*) AS customers FROM customer GROUP BY country",
+          "sql": "SELECT country, COUNT(*) AS customer_count\nFROM customer\nGROUP BY country",
+          "correct": true,
+          "rows": 24,
+          "error_kind": null,
+          "error": null,
+          "latency_ms": 4830.210599990096,
+          "llm_calls": 1,
+          "cost_usd": 0.0
+        },
+        {
+          "question": "Only the countries with more than 3 customers.",
+          "tags": [
+            "follow-up",
+            "having"
+          ],
+          "gold_sql": "SELECT country, count(*) AS customers FROM customer GROUP BY country HAVING count(*) > 3",
+          "sql": "SELECT country, COUNT(*) AS customer_count\nFROM customer\nGROUP BY country\nHAVING COUNT(customer_id) > 3",
+          "correct": true,
+          "rows": 5,
+          "error_kind": null,
+          "error": null,
+          "latency_ms": 6345.745900005568,
+          "llm_calls": 1,
+          "cost_usd": 0.0
+        }
+      ]
+    },
+    {
+      "id": "s06",
+      "turns": [
+        {
+          "question": "Which 3 artists have the most albums? Show the artist name and the number of albums, most first.",
+          "tags": [
+            "join",
+            "aggregate",
+            "order-limit"
+          ],
+          "gold_sql": "SELECT r.name, count(*) AS albums FROM album a JOIN artist r ON r.artist_id = a.artist_id GROUP BY r.artist_id, r.name ORDER BY albums DESC LIMIT 3",
+          "sql": "SELECT a.name AS artist_name, COUNT(*) AS num_albums\nFROM artist a\nJOIN album b ON a.artist_id = b.artist_id\nGROUP BY a.name\nORDER BY num_albums DESC\nLIMIT 3",
+          "correct": true,
+          "rows": 3,
+          "error_kind": null,
+          "error": null,
+          "latency_ms": 10659.620599995833,
+          "llm_calls": 1,
+          "cost_usd": 0.0
+        }
+      ]
+    },
+    {
+      "id": "s07",
+      "turns": [
+        {
+          "question": "What is the total revenue for each billing country? Show the country and the revenue.",
+          "tags": [
+            "aggregate"
+          ],
+          "gold_sql": "SELECT billing_country, sum(total) AS revenue FROM invoice GROUP BY billing_country",
+          "sql": "SELECT billing_country, SUM(unit_price * quantity) AS total_revenue\nFROM invoice_line\nJOIN invoice ON invoice_line.invoice_id = invoice.invoice_id\nJOIN customer ON invoice.customer_id = customer.customer_id\nGROUP BY billing_country",
+          "correct": true,
+          "rows": 24,
+          "error_kind": null,
+          "error": null,
+          "latency_ms": 10767.445700010285,
+          "llm_calls": 1,
+          "cost_usd": 0.0
+        }
+      ]
+    },
+    {
+      "id": "s08",
+      "turns": [
+        {
+          "question": "Which employees report to Nancy Edwards? Give their first and last names.",
+          "tags": [
+            "self-join"
+          ],
+          "gold_sql": "SELECT e.first_name, e.last_name FROM employee e JOIN employee m ON m.employee_id = e.reports_to WHERE m.first_name = 'Nancy' AND m.last_name = 'Edwards'",
+          "sql": "SELECT first_name, last_name\nFROM employee\nWHERE last_name = 'EDWARDS' AND first_name = 'Nancy';",
+          "correct": false,
+          "rows": 0,
+          "error_kind": null,
+          "error": null,
+          "latency_ms": 6974.821999960113,
+          "llm_calls": 1,
+          "cost_usd": 0.0
+        }
+      ]
+    },
+    {
+      "id": "s09",
+      "turns": [
+        {
+          "question": "What is the average track length in minutes for each media type? Show the media type name and the average.",
+          "tags": [
+            "join",
+            "aggregate"
+          ],
+          "gold_sql": "SELECT m.name, avg(t.milliseconds) / 60000.0 AS avg_minutes FROM track t JOIN media_type m ON m.media_type_id = t.media_type_id GROUP BY m.media_type_id, m.name",
+          "sql": "SELECT \n    mt.name AS media_type_name,\n    AVG(track.milliseconds / 60000) AS average_track_length_minutes\nFROM \n    media_type mt\nJOIN \n    track ON mt.media_type_id = track.media_type_id\nGROUP BY \n    mt.name",
+          "correct": false,
+          "rows": 5,
+          "error_kind": null,
+          "error": null,
+          "latency_ms": 12974.91920000175,
+          "llm_calls": 1,
+          "cost_usd": 0.0
+        }
+      ]
+    },
+    {
+      "id": "s10",
+      "turns": [
+        {
+          "question": "Which genre has the most tracks?",
+          "tags": [
+            "join",
+            "order-limit"
+          ],
+          "gold_sql": "SELECT g.name FROM track t JOIN genre g ON g.genre_id = t.genre_id GROUP BY g.genre_id, g.name ORDER BY count(*) DESC LIMIT 1",
+          "sql": "SELECT g.name AS genre_name, COUNT(*) AS track_count\nFROM genre g\nJOIN track t ON g.genre_id = t.genre_id\nGROUP BY g.genre_id, g.name\nORDER BY track_count DESC\nLIMIT 1;",
+          "correct": true,
+          "rows": 1,
+          "error_kind": null,
+          "error": null,
+          "latency_ms": 9993.63490001997,
+          "llm_calls": 1,
+          "cost_usd": 0.0
+        }
+      ]
+    },
+    {
+      "id": "s11",
+      "turns": [
+        {
+          "question": "How many invoices were issued in 2023?",
+          "tags": [
+            "date"
+          ],
+          "gold_sql": "SELECT count(*) AS invoices FROM invoice WHERE invoice_date >= '2023-01-01' AND invoice_date < '2024-01-01'",
+          "sql": "SELECT COUNT(*) \nFROM invoice \nWHERE invoice_date >= '2023-01-01' AND invoice_date < '2024-01-01';",
+          "correct": true,
+          "rows": 1,
+          "error_kind": null,
+          "error": null,
+          "latency_ms": 10929.080200032331,
+          "llm_calls": 1,
+          "cost_usd": 0.0
+        }
+      ]
+    },
+    {
+      "id": "s12",
+      "turns": [
+        {
+          "question": "Who are the top 3 customers by total spending? Show first name, last name and the total spent, highest first.",
+          "tags": [
+            "join",
+            "aggregate",
+            "order-limit"
+          ],
+          "gold_sql": "SELECT c.first_name, c.last_name, sum(i.total) AS spent FROM customer c JOIN invoice i ON i.customer_id = c.customer_id GROUP BY c.customer_id, c.first_name, c.last_name ORDER BY spent DESC LIMIT 3",
+          "sql": "SELECT c.first_name, c.last_name, SUM(il.unit_price * il.quantity) AS total_spent\nFROM customer c\nJOIN invoice i ON c.customer_id = i.customer_id\nJOIN invoice_line il ON i.invoice_id = il.invoice_id\nGROUP BY c.first_name, c.last_name\nORDER BY total_spent DESC\nLIMIT 3;",
+          "correct": true,
+          "rows": 3,
+          "error_kind": null,
+          "error": null,
+          "latency_ms": 17172.11210000096,
+          "llm_calls": 1,
+          "cost_usd": 0.0
+        }
+      ]
+    }
+  ]
+}
