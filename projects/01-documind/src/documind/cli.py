@@ -1,14 +1,15 @@
-"""Command line: ``documind init-db``, ``documind ingest`` and ``documind eval``.
+"""Command line: ``documind init-db``, ``ingest``, ``eval``, ``ask`` and ``eval-answers``.
 
 Run with ``uv run documind <command>``. Settings come from environment
 variables or ``.env`` (``DOCUMIND_*`` for DocuMind, ``AICORE_*`` for the
-embedding model).
+models).
 """
 
 import argparse
 import asyncio
 import logging
 import sys
+import time
 from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 
@@ -16,12 +17,21 @@ import psycopg
 from aicore.config import LLMSettings
 from aicore.errors import LLMError
 from aicore.providers.factory import build_client
-from aicore.tracing import LogTracer
+from aicore.tracing import CallRecord, InMemoryTracer, LogTracer
 
+from documind.answer_eval import (
+    JUDGE_VERSION,
+    AnswerEvalRun,
+    evaluate_answers,
+    format_answer_run,
+)
+from documind.ask import answer_question, refusal_message
 from documind.config import DocumindSettings
 from documind.corpus import load_documents
 from documind.evaluate import EvalRun, evaluate_retrieval, format_run
+from documind.generation import CONTEXT_CHUNKS, PROMPT_VERSION, Answer
 from documind.golden import Split, load_golden
+from documind.guards import answer_guards
 from documind.pipeline import DimensionMismatchError, ingest
 from documind.retrieval import RETRIEVER_NAMES, RetrieverName, build_retriever
 from documind.store import PgChunkStore, connect, init_db
@@ -92,6 +102,74 @@ async def run_eval(
     print(f"Saved {path}")
 
 
+async def run_ask(
+    settings: DocumindSettings, llm_settings: LLMSettings, question: str, name: RetrieverName
+) -> None:
+    """Answer ``question`` and print the answer, its sources, cost and latency."""
+    tracer = InMemoryTracer()
+    client = build_client(llm_settings, tracer=tracer, output_guards=answer_guards())
+    start = time.perf_counter()
+    try:
+        async with await connect(settings.database_url) as conn:
+            retriever = build_retriever(
+                name, PgChunkStore(conn), client, settings.embedding_dimensions
+            )
+            answer = await answer_question(question, retriever, client)
+    finally:
+        await client.aclose()
+    seconds = time.perf_counter() - start
+    print(format_answer(answer, seconds=seconds, calls=tracer.records))
+
+
+def format_answer(answer: Answer, *, seconds: float, calls: Sequence[CallRecord]) -> str:
+    """Render ``answer`` for the terminal: text, numbered sources, then a stats line.
+
+    The stats line shows total time, the time of each traced call
+    (embed, rerank, complete) and their summed cost.
+    """
+    if answer.refused:
+        lines = [f"No answer: {refusal_message(answer)}"]
+    else:
+        lines = [answer.text, "", "Sources:"]
+        lines += [f"  [{c.number}] {c.document_title} > {c.section}" for c in answer.citations]
+    cost = sum(c.cost_usd or 0.0 for c in calls)
+    steps = ", ".join(f"{c.operation} {c.latency_ms / 1000:.1f} s" for c in calls)
+    timing = f"{seconds:.1f} s ({steps})" if steps else f"{seconds:.1f} s"
+    lines += ["", f"{timing}, ${cost:.4f}"]
+    return "\n".join(lines)
+
+
+async def run_eval_answers(
+    settings: DocumindSettings, llm_settings: LLMSettings, name: RetrieverName, split: Split
+) -> None:
+    """Answer and score the golden ``split``, print the report and save JSON."""
+    cases = load_golden(settings.evals_dir / "golden.jsonl", split)
+    tracer = InMemoryTracer()
+    client = build_client(llm_settings, tracer=tracer, output_guards=answer_guards())
+    try:
+        async with await connect(settings.database_url) as conn:
+            retriever = build_retriever(
+                name, PgChunkStore(conn), client, settings.embedding_dimensions
+            )
+            report = await evaluate_answers(cases, retriever, client, tracer)
+    finally:
+        await client.aclose()
+    run = AnswerEvalRun(
+        prompt_version=PROMPT_VERSION,
+        judge_version=JUDGE_VERSION,
+        model=llm_settings.model,
+        retriever=name,
+        split=split,
+        context_chunks=CONTEXT_CHUNKS,
+        created_at=datetime.now(UTC),
+        report=report,
+    )
+    path = run.save(settings.evals_dir / "results")
+    print(format_answer_run(run))
+    print()
+    print(f"Saved {path}")
+
+
 def _loop_factory() -> Callable[[], asyncio.AbstractEventLoop] | None:
     """Return a selector loop on Windows; psycopg async cannot use Proactor."""
     return asyncio.SelectorEventLoop if sys.platform == "win32" else None
@@ -114,6 +192,24 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="default: hybrid-rerank (chosen in M4, see ADR 0011)",
     )
     eval_cmd.add_argument("--k", type=int, default=10, help="chunks to retrieve (default: 10)")
+    ask_cmd = commands.add_parser("ask", help="Answer a question from the documents, with sources.")
+    ask_cmd.add_argument("question", help="the question, in quotes")
+    ask_cmd.add_argument(
+        "--retriever",
+        choices=RETRIEVER_NAMES,
+        default="hybrid-rerank",
+        help="default: hybrid-rerank",
+    )
+    answers_cmd = commands.add_parser(
+        "eval-answers", help="Score answers: refusals, citations and an LLM judge."
+    )
+    answers_cmd.add_argument("--split", choices=["dev", "test"], default="dev", help="default: dev")
+    answers_cmd.add_argument(
+        "--retriever",
+        choices=RETRIEVER_NAMES,
+        default="hybrid-rerank",
+        help="default: hybrid-rerank",
+    )
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -125,6 +221,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             coro = run_init_db(settings)
         elif args.command == "ingest":
             coro = run_ingest(settings, LLMSettings())
+        elif args.command == "eval-answers":
+            coro = run_eval_answers(settings, LLMSettings(), args.retriever, args.split)
+        elif args.command == "ask":
+            coro = run_ask(settings, LLMSettings(), args.question, args.retriever)
         else:
             split = None if args.split == "all" else args.split
             coro = run_eval(settings, LLMSettings(), args.retriever, split, args.k)

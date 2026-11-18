@@ -4,10 +4,12 @@ This is the one place that maps ``AICORE_PROVIDER`` to an adapter class,
 so projects never import a concrete provider directly.
 """
 
+from collections.abc import Sequence
 from typing import assert_never
 
 from aicore.client import LLMClient
 from aicore.config import LLMSettings
+from aicore.guardrails import InputGuardrail, OutputGuardrail
 from aicore.providers.base import LLMProvider
 from aicore.providers.cloudflare import CloudflareProvider
 from aicore.providers.fakeai import FakeProvider
@@ -42,27 +44,54 @@ def build_provider(settings: LLMSettings) -> LLMProvider:
             assert_never(name)
 
 
-def build_client(settings: LLMSettings, *, tracer: Tracer | None = None) -> LLMClient:
+def build_client(
+    settings: LLMSettings,
+    *,
+    tracer: Tracer | None = None,
+    input_guards: Sequence[InputGuardrail] = (),
+    output_guards: Sequence[OutputGuardrail] = (),
+) -> LLMClient:
     """Build an ``LLMClient`` wired to the configured provider.
 
     The one adapter also serves ``embed`` and ``rerank`` when it supports
     them (Cloudflare and fake do; Ollama only chats). Call
     ``await client.aclose()`` when finished.
 
+    Args:
+        settings: Validated settings; ``provider`` picks the adapter.
+        tracer: Receives one record per call.
+        input_guards: Run on every ``complete`` request (see ``LLMClient``).
+        output_guards: Run on every ``complete`` reply.
+
     Raises:
         ValueError: If the chosen provider's required settings are missing.
     """
+
+    def client(
+        provider: LLMProvider, backend: CloudflareProvider | FakeProvider | None
+    ) -> LLMClient:
+        """Wrap ``provider``; ``backend`` also embeds and reranks when given."""
+        return LLMClient(
+            provider,
+            settings,
+            tracer=tracer,
+            embedder=backend,
+            reranker=backend,
+            input_guards=input_guards,
+            output_guards=output_guards,
+        )
+
     name = settings.provider
     match name:
         case "fake":
             fake = FakeProvider(model=settings.model)
-            return LLMClient(fake, settings, tracer=tracer, embedder=fake, reranker=fake)
+            return client(fake, fake)
         case "cloudflare":
             cf = _build_cloudflare(settings)
-            return LLMClient(cf, settings, tracer=tracer, embedder=cf, reranker=cf)
+            return client(cf, cf)
         case "ollama":
             ollama = OllamaProvider(str(settings.ollama_base_url))
-            return LLMClient(ollama, settings, tracer=tracer)
+            return client(ollama, None)
         case _:
             assert_never(name)
 

@@ -2,8 +2,9 @@
 
 import pytest
 from aicore.config import LLMSettings, ProviderName
-from aicore.errors import InvalidRequestError
-from aicore.models import EmbedRequest, RerankRequest
+from aicore.errors import GuardrailError, InvalidRequestError
+from aicore.guardrails import MaxInputChars, SecretLeakGuard
+from aicore.models import EmbedRequest, LLMRequest, Message, RerankRequest
 from aicore.providers.cloudflare import CloudflareProvider
 from aicore.providers.factory import build_client, build_provider
 from aicore.providers.fakeai import FakeProvider
@@ -102,3 +103,19 @@ def test_build_client_cloudflare_fails_fast_without_credentials() -> None:
 
     with pytest.raises(ValueError, match="AICORE_API_KEY"):
         build_client(settings)
+
+
+async def test_build_client_passes_guards_to_the_client() -> None:
+    """Input and output guards given to the factory run on ``complete``."""
+    settings = LLMSettings(_env_file=None, provider="fake")
+    short = build_client(settings, input_guards=[MaxInputChars(3)])
+    # The fake always replies "fake reply"; treat that text as a leaked secret.
+    leaky = build_client(settings, output_guards=[SecretLeakGuard([("fake", r"fake reply")])])
+    request = LLMRequest(messages=[Message(role="user", content="hello")])
+
+    with pytest.raises(GuardrailError, match="max_input_chars"):
+        await short.complete(request)
+    with pytest.raises(GuardrailError, match="secret_leak"):
+        await leaky.complete(request)
+    await short.aclose()
+    await leaky.aclose()

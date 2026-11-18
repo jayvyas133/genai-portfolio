@@ -3,21 +3,23 @@
 Question answering over documents with cited sources, built as a RAG
 (Retrieval-Augmented Generation) service.
 
-**Stack:** Python 3.12, Flask, Postgres + pgvector, embeddings and
-reranking through [`aicore`](../../packages/aicore) (Cloudflare Workers AI,
-BGE (BAAI General Embedding) `bge-base-en-v1.5` and `bge-reranker-base`).
+**Stack:** Python 3.12, Flask, Postgres + pgvector; every model call goes
+through [`aicore`](../../packages/aicore) (Cloudflare Workers AI: BGE (BAAI
+General Embedding) `bge-base-en-v1.5` embeddings, `bge-reranker-base`
+reranker, `llama-3.3-70b-instruct-fp8-fast` for answers).
 
-_Status: M4 (hybrid retrieval and reranking) done. Cited answers and the
-API follow._
+_Status: M5 (cited answers, refusals, guardrails) done. The HTTP API
+follows in M6._
 
 ## Problem
 
 An LLM (Large Language Model) can't answer reliably about documents it
 has never seen, and it can't say where an answer came from. DocuMind
 retrieves the relevant passages first and answers from them with
-citations. So far this README covers turning a folder of documents into
-searchable chunks, finding the right ones for a question, and measuring
-how well that works.
+citations, or refuses when the documents don't hold the answer. This
+README covers turning a folder of documents into searchable chunks,
+finding the right ones for a question, answering from them, and
+measuring each stage separately.
 
 ## Architecture (ingestion)
 
@@ -44,7 +46,11 @@ flowchart LR
 | `golden.py` | Golden dataset models, loader and quote validator |
 | `metrics.py` | Hit rate@k, recall@k, MRR (Mean Reciprocal Rank) from evidence ranks |
 | `evaluate.py` | Runs the golden questions through a retriever; table + saved JSON |
-| `cli.py` | `documind init-db`, `documind ingest`, `documind eval` |
+| `generation.py` | Numbered-source prompt, `[n]` citation parsing, refusal rules |
+| `guards.py` | Question checks (length, PII, injection) and the reply's secret-leak check |
+| `ask.py` | `answer_question`: guard → retrieve → generate (shared by CLI, eval and API) |
+| `answer_eval.py` | Refusal accuracy, citation precision, LLM-judge correctness |
+| `cli.py` | `documind init-db`, `ingest`, `eval`, `ask`, `eval-answers` |
 
 ## How to run
 
@@ -53,7 +59,8 @@ flowchart LR
 docker compose -f infra/docker-compose.yml up -d postgres
 
 # 2. Configure: copy .env.example to .env, then set
-#    AICORE_PROVIDER=cloudflare, AICORE_EMBED_MODEL=@cf/baai/bge-base-en-v1.5,
+#    AICORE_PROVIDER=cloudflare, AICORE_MODEL=@cf/meta/llama-3.3-70b-instruct-fp8-fast,
+#    AICORE_EMBED_MODEL=@cf/baai/bge-base-en-v1.5,
 #    AICORE_RERANK_MODEL=@cf/baai/bge-reranker-base,
 #    AICORE_API_KEY and AICORE_CLOUDFLARE_ACCOUNT_ID
 uv sync --all-packages
@@ -65,6 +72,10 @@ uv run documind ingest
 # 4. Score retrieval on the golden questions (dev split, hybrid-rerank by default)
 uv run documind eval --split dev
 uv run documind eval --split dev --retriever dense   # or sparse, hybrid, dense-rerank
+
+# 5. Ask a question; score answers on the golden questions
+uv run documind ask "When was CUDA first released?"
+uv run documind eval-answers --split dev
 ```
 
 Run the commands from the repo root: `.env` is read from the current
@@ -172,6 +183,80 @@ Full tables per split and kind are in `evals/results/`.
   ("RTX 3090") that embeddings blur. See
   [ADR 0011](../../docs/adr/0011-documind-hybrid-retrieval-and-reranking.md).
 
+## Answers: citations, refusals and guardrails
+
+```mermaid
+flowchart LR
+    Q[question] --> G{check_question<br/>length ≤ 1000, PII redacted,<br/>injection phrases}
+    G -- blocked --> B[refusal: blocked<br/>no retrieval, no model call]
+    G -- ok --> R[hybrid-rerank<br/>top 5 chunks]
+    R -- none --> N[refusal: no_sources]
+    R --> P["prompt: rules + &lt;sources&gt;[1]..[5]&lt;/sources&gt;<br/>+ question, temperature 0"]
+    P --> L[aicore complete_structured<br/>Llama 3.3 70B, SecretLeakGuard]
+    L --> C{"refused? any valid [n]?"}
+    C -- refused --> M[refusal: model]
+    C -- no valid marker --> U[refusal: uncited<br/>draft kept for evals]
+    C -- cited --> A[answer + sources]
+```
+
+```text
+$ uv run documind ask "Who founded Nvidia and in which year?"
+Nvidia was founded by Jensen Huang, Chris Malachowsky, and Curtis Priem in 1993 [1][2][3][4].
+
+Sources:
+  [1] Nvidia > History > Founding
+  [2] Nvidia > Introduction
+  ...
+
+3.0 s (embed 0.3 s, rerank 0.5 s, complete 2.0 s), $0.0006
+```
+
+- **The `[n]` markers are the citations.** No separate list can
+  disagree with the text. Markers outside `1..5` are counted as
+  invalid, never shown.
+- **No valid citation, no answer.** Besides the model's own refusal, an
+  uncited answer is withheld, so every shown answer points at a chunk.
+- **Guards check the question, not the documents.** Redacting PII
+  (Personally Identifiable Information) in sources would break
+  citations, and matching injection phrases in them would block honest
+  questions. Documents are fenced in `<sources>` tags and declared
+  data, not instructions.
+
+**Answer evals** (`documind eval-answers`): refusal accuracy, citation
+precision (does the cited chunk contain the labelled evidence quote? no
+model needed), and correctness by an LLM judge against the reference
+answer. Dev was used to build the prompt; test was run once.
+
+| Metric | Dev (36 + 4 unanswerable) | Test (18 + 2) |
+|---|---|---|
+| Unanswerable questions refused | 4/4 | 2/2 |
+| False refusals (answerable refused) | 0/36 | 1/18 |
+| Answers with a supported citation | 35/36 | 17/17 |
+| Citation precision (lower bound) | 0.69 | 0.57 |
+| Correct (LLM judge), factual | 30/30 | 12/14 |
+| Correct (LLM judge), multi-hop | 3/6 | 3/4 |
+| Correct end to end, all answerable | **33/36** | **15/18** (17/18 by hand) |
+
+| Per answer | p50 | p95 | Cost |
+|---|---|---|---|
+| Dev | 2.1 s | 2.8 s | $0.00055 |
+| Test | 2.0 s | 2.7 s | $0.00054 |
+
+- **Prompt v1 → v2** (one worked example added) took cited answers on dev
+  from 32/36 to 35/36 and JSON errors from 1 to 0.
+- **Multi-hop misses are retrieval misses**: the second passage never
+  reached the top 5.
+- **The judge is not trusted blindly.** 10 dev verdicts were checked by
+  hand (all agreed). Two of the three non-correct test verdicts are judge
+  errors (marking down a true extra detail, and an omission the question
+  didn't ask about). They were reported, not fixed, so the test set stays
+  unseen.
+- **Citation precision is a lower bound**: the model cites 3–4 chunks per
+  sentence, and some extra ones state the fact in words the evidence
+  label doesn't list.
+
+See [ADR 0012](../../docs/adr/0012-documind-cited-generation-refusals-guardrails.md).
+
 ## Design decisions
 
 - **Chunks never cross a section heading**, and boilerplate (References,
@@ -212,9 +297,18 @@ Full tables per split and kind are in `evals/results/`.
   adds a paid call per query. Fine before an LLM call that takes
   seconds; too slow for search-as-you-type.
 - If the rerank call fails, the query fails. A fallback to the
-  un-reranked order belongs with the API (M6).
+  un-reranked order belongs with the API (M6), along with streaming.
 - BM25 (Best Matching 25) ranking, or document titles in the keyword
   index, might make hybrid useful without the reranker; not needed now.
 - RRF constant (60) and candidate depths (50, 30) were not swept: with
   36 dev cases a sweep would mostly fit noise.
-- Next: answers with citations, refusals and guardrails (M5).
+- Answers take about 2 s (rerank 0.5–1.3 s, model 1–2 s); one
+  Cloudflare call took 33 s, so the API needs a timeout.
+- The judge is the answering model itself; a different model family
+  would reduce shared blind spots.
+- Future: a faithfulness judge (one answer used the model's own
+  knowledge and still carried a citation), fewer citations per
+  sentence, multi-hop question decomposition, a rerank-score refusal
+  gate once there are more unanswerable questions, and a configurable
+  question length limit.
+- Next: the Flask HTTP API and a one-command run (M6).

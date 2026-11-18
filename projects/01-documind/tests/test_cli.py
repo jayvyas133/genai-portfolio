@@ -8,8 +8,10 @@ covered by the integration test.
 from pathlib import Path
 
 import pytest
+from aicore.tracing import CallRecord
 from documind import cli
 from documind.config import DocumindSettings
+from documind.generation import Answer, Citation
 
 # Port 1 refuses connections immediately; nothing listens there.
 UNREACHABLE_DB = "postgresql://u:p@127.0.0.1:1/nope?connect_timeout=2"
@@ -117,3 +119,48 @@ def test_eval_rejects_an_unknown_split(capsys: pytest.CaptureFixture[str]) -> No
 
     assert exc.value.code == 2
     assert "invalid choice" in capsys.readouterr().err
+
+
+def test_format_answer_lists_sources_and_stats() -> None:
+    """An answer prints its text, each cited source and one stats line."""
+    answer = Answer(
+        text="In 2007 [1].",
+        citations=[Citation(number=1, chunk_id=11, document_title="CUDA", section="History")],
+    )
+    calls = [
+        CallRecord(
+            operation="embed",
+            provider="p",
+            model="m",
+            latency_ms=210,
+            attempts=1,
+            outcome="ok",
+            cost_usd=0.00001,
+        ),
+        CallRecord(
+            provider="p", model="m", latency_ms=1150, attempts=1, outcome="ok", cost_usd=0.0005
+        ),
+    ]
+    out = cli.format_answer(answer, seconds=2.34, calls=calls)
+    assert out == (
+        "In 2007 [1].\n\nSources:\n  [1] CUDA > History\n\n"
+        "2.3 s (embed 0.2 s, complete 1.1 s), $0.0005"
+    )
+
+
+def test_format_answer_explains_a_refusal() -> None:
+    """A refusal prints the reason instead of text and sources."""
+    answer = Answer(text="", refusal_reason="model")
+    out = cli.format_answer(answer, seconds=0.1, calls=[])
+    assert out.startswith("No answer: The documents do not contain the answer")
+    assert "Sources" not in out
+    assert out.endswith("\n0.1 s, $0.0000")
+
+
+def test_ask_requires_a_question(capsys: pytest.CaptureFixture[str]) -> None:
+    """``documind ask`` with no question is a usage error."""
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["ask"])
+
+    assert exc.value.code == 2
+    assert "question" in capsys.readouterr().err

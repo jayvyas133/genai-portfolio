@@ -11,8 +11,10 @@ One adapter serves chat completion, embedding
 ``_run``, so errors are classified identically.
 """
 
+import json
+
 import httpx
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ValidationError, field_validator
 
 from aicore.errors import (
     InvalidRequestError,
@@ -64,6 +66,20 @@ class _ChatResult(BaseModel):
     response: str
     model: str | None = None
     usage: _CloudflareUsage = _CloudflareUsage()
+
+    @field_validator("response", mode="before")
+    @classmethod
+    def _json_reply_to_text(cls, value: object) -> object:
+        """Turn an already-parsed JSON reply back into text.
+
+        When a model (seen with Llama 3.3) replies with pure JSON,
+        Workers AI returns ``response`` as an object, not a string.
+        Re-serializing keeps ``LLMResponse.text`` a string for every
+        reply, so ``complete_structured`` parses it as usual.
+        """
+        if isinstance(value, dict | list):
+            return json.dumps(value)
+        return value
 
 
 class _EmbedResult(BaseModel):
@@ -263,7 +279,12 @@ class CloudflareProvider:
             detail = _format_errors(body.errors, response)
             msg = f"Cloudflare reported failure: {detail}"
             raise InvalidRequestError(msg)
-        return result_type.model_validate(body.result)
+        try:
+            return result_type.model_validate(body.result)
+        except ValidationError as exc:
+            # A shape this adapter does not know; resending will not fix it.
+            msg = f"Unexpected Cloudflare result for {model}: {exc.error_count()} error(s)"
+            raise InvalidRequestError(msg) from exc
 
 
 def _require_model(model: str | None) -> str:

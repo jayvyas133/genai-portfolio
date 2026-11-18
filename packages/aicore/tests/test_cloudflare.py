@@ -105,6 +105,25 @@ async def test_complete_maps_reply_and_usage() -> None:
     assert reply.usage.neurons == 0.95
 
 
+async def test_complete_turns_a_parsed_json_reply_back_into_text() -> None:
+    """Workers AI returns pure-JSON replies as an object; the text is that JSON."""
+    body = {**OK_BODY, "result": {"response": {"answer": "x", "refused": False}}}
+    provider = make_provider(lambda r: httpx.Response(200, json=body))
+
+    reply = await provider.complete(make_request())
+
+    assert json.loads(reply.text) == {"answer": "x", "refused": False}
+
+
+async def test_complete_rejects_an_unknown_result_shape() -> None:
+    """A result the adapter cannot read is an aicore error, not a pydantic one."""
+    body = {**OK_BODY, "result": {"response": 42}}
+    provider = make_provider(lambda r: httpx.Response(200, json=body))
+
+    with pytest.raises(InvalidRequestError, match="Unexpected Cloudflare result"):
+        await provider.complete(make_request())
+
+
 async def test_complete_sends_expected_request() -> None:
     """URL holds account and model; token is a Bearer
     header; the body has no ``model`` key."""

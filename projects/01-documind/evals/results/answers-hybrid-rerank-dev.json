@@ -1,0 +1,1036 @@
+{
+  "prompt_version": "v2",
+  "judge_version": "v1",
+  "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+  "retriever": "hybrid-rerank",
+  "split": "dev",
+  "context_chunks": 5,
+  "created_at": "2026-11-18T03:09:56.378411Z",
+  "report": {
+    "cases": [
+      {
+        "id": "amd-001",
+        "kind": "factual",
+        "question": "When was AMD incorporated, and who led its founding?",
+        "reference_answer": "On May 1, 1969, by Jerry Sanders and seven colleagues from Fairchild Semiconductor.",
+        "answer": "AMD was formally incorporated on May 1, 1969 [1][3], and it was founded by Jerry Sanders, along with seven of his colleagues from Fairchild Semiconductor [1].",
+        "draft": "AMD was formally incorporated on May 1, 1969 [1][3], and it was founded by Jerry Sanders, along with seven of his colleagues from Fairchild Semiconductor [1].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          2353,
+          2355
+        ],
+        "citation_supported": [
+          true,
+          false
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer matches the reference, stating the correct date and founders of AMD.",
+        "judge_error": false,
+        "latency_ms": 2813.9886999852024,
+        "cost_usd": 0.0006556233139038086
+      },
+      {
+        "id": "amd-002",
+        "kind": "factual",
+        "question": "Which game consoles use custom chips designed by AMD?",
+        "reference_answer": "PlayStation 4, Xbox One and their successors, including Xbox Series X/S and PlayStation 5.",
+        "answer": "The PlayStation 4, PlayStation 4 Pro, Xbox One, Xbox One S, Xbox One X, Xbox Series X/S, and PlayStation 5 use custom chips designed by AMD [1][2][3][4]. The Nintendo Wii U is powered by an AMD GPU [2][3].",
+        "draft": "The PlayStation 4, PlayStation 4 Pro, Xbox One, Xbox One S, Xbox One X, Xbox Series X/S, and PlayStation 5 use custom chips designed by AMD [1][2][3][4]. The Nintendo Wii U is powered by an AMD GPU [2][3].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          2392,
+          2419,
+          2420,
+          2384
+        ],
+        "citation_supported": [
+          true,
+          false,
+          false,
+          false
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer includes all the consoles mentioned in the reference and adds extra detail that does not contradict it, but also mentions a console not in the reference",
+        "judge_error": false,
+        "latency_ms": 2276.930300053209,
+        "cost_usd": 0.0006101426544189453
+      },
+      {
+        "id": "ampere-001",
+        "kind": "factual",
+        "question": "What manufacturing processes are used for the A100 and for the GeForce 30 series?",
+        "reference_answer": "TSMC 7 nm FinFET for the A100 and a custom Samsung 8 nm process (8N) for the GeForce 30 series.",
+        "answer": "The A100 uses TSMC's 7 nm FinFET process [1]. The GeForce 30 series uses a custom version of Samsung's 8 nm process (8N) [1].",
+        "draft": "The A100 uses TSMC's 7 nm FinFET process [1]. The GeForce 30 series uses a custom version of Samsung's 8 nm process (8N) [1].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          2430
+        ],
+        "citation_supported": [
+          true
+        ],
+        "invalid_citations": [],
+        "evidence_total": 2,
+        "evidence_cited": 2,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer matches the reference, stating the correct manufacturing processes for both the A100 and the GeForce 30 series.",
+        "judge_error": false,
+        "latency_ms": 2057.175100024324,
+        "cost_usd": 0.0006612085380554199
+      },
+      {
+        "id": "blackwell-001",
+        "kind": "factual",
+        "question": "How many transistors are on the GB100 die?",
+        "reference_answer": "104 billion, about 30% more than Hopper's GH100.",
+        "answer": "The GB100 die contains 104 billion transistors [1].",
+        "draft": "The GB100 die contains 104 billion transistors [1].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          2441
+        ],
+        "citation_supported": [
+          true
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer matches the reference answer exactly, stating the correct number of transistors on the GB100 die.",
+        "judge_error": false,
+        "latency_ms": 2689.2627000343055,
+        "cost_usd": 0.000507097885131836
+      },
+      {
+        "id": "cuda-001",
+        "kind": "factual",
+        "question": "What research language did Ian Buck create that later became CUDA?",
+        "reference_answer": "Brook, a language for general-purpose computing on GPUs, which Nvidia turned into CUDA.",
+        "answer": "Ian Buck created the research language Brook, which later became CUDA [1].",
+        "draft": "Ian Buck created the research language Brook, which later became CUDA [1].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          2451
+        ],
+        "citation_supported": [
+          true
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer matches the key facts of the reference, stating that Ian Buck created Brook, which later became CUDA.",
+        "judge_error": false,
+        "latency_ms": 1814.03379997937,
+        "cost_usd": 0.0004964435653686523
+      },
+      {
+        "id": "cuda-002",
+        "kind": "factual",
+        "question": "How many threads should run together in a group for good CUDA performance?",
+        "reference_answer": "At least 32, with thousands of threads in total.",
+        "answer": "Threads should be running in groups of at least 32 for best performance [1][2].",
+        "draft": "Threads should be running in groups of at least 32 for best performance [1][2].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          2457,
+          2458
+        ],
+        "citation_supported": [
+          true,
+          false
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer matches the reference by stating that threads should run in groups of at least 32 for good performance.",
+        "judge_error": false,
+        "latency_ms": 1606.1157999793068,
+        "cost_usd": 0.0004825741424560547
+      },
+      {
+        "id": "dlss-001",
+        "kind": "factual",
+        "question": "How does DLSS Frame Generation produce extra frames?",
+        "reference_answer": "It takes two rendered frames and generates a new frame in between; one extra frame per rendered frame.",
+        "answer": "The DLSS Frame Generation algorithm takes two rendered frames from the rendering pipeline and generates a new frame that smoothly transitions between them [1]. For every frame rendered, one additional frame is generated [1].",
+        "draft": "The DLSS Frame Generation algorithm takes two rendered frames from the rendering pipeline and generates a new frame that smoothly transitions between them [1]. For every frame rendered, one additional frame is generated [1].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          2482
+        ],
+        "citation_supported": [
+          true
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer accurately describes the process of DLSS Frame Generation producing extra frames by generating a new frame between two rendered frames, matching the key facts of the reference answer.",
+        "judge_error": false,
+        "latency_ms": 1963.1666000350378,
+        "cost_usd": 0.000568018928527832
+      },
+      {
+        "id": "dlss-002",
+        "kind": "factual",
+        "question": "What replaced hand-written heuristics for fixing ghosting in DLSS 2?",
+        "reference_answer": "A convolutional auto-encoder neural network trained to identify and fix temporal artifacts.",
+        "answer": "DLSS 2 uses a convolutional auto-encoder neural network trained to identify and fix temporal artifacts, instead of manually programmed heuristics [1][2].",
+        "draft": "DLSS 2 uses a convolutional auto-encoder neural network trained to identify and fix temporal artifacts, instead of manually programmed heuristics [1][2].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          2479,
+          2480
+        ],
+        "citation_supported": [
+          true,
+          true
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer matches the reference, stating that a convolutional auto-encoder neural network replaced hand-written heuristics for fixing ghosting in DLSS 2.",
+        "judge_error": false,
+        "latency_ms": 2079.5336000155658,
+        "cost_usd": 0.0006032908592224121
+      },
+      {
+        "id": "directx-001",
+        "kind": "factual",
+        "question": "When was DirectX 12 Ultimate revealed?",
+        "reference_answer": "March 2020.",
+        "answer": "Microsoft revealed DirectX 12 Ultimate in March 2020 [1].",
+        "draft": "Microsoft revealed DirectX 12 Ultimate in March 2020 [1].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          2517
+        ],
+        "citation_supported": [
+          true
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer matches the reference answer, stating the correct month and year when DirectX 12 Ultimate was revealed.",
+        "judge_error": false,
+        "latency_ms": 2066.263699962292,
+        "cost_usd": 0.0005241118316650391
+      },
+      {
+        "id": "directx-002",
+        "kind": "factual",
+        "question": "Where does the name of Microsoft's Xbox console come from?",
+        "reference_answer": "From DirectX: the X indicated the console was based on DirectX technology.",
+        "answer": "The name of Microsoft's Xbox console comes from the fact that it is based on DirectX technology, with the X standing in for the particular API names [2]. The Xbox API was similar to Direct3D 8.1 and was developed jointly between Microsoft and Nvidia [3].",
+        "draft": "The name of Microsoft's Xbox console comes from the fact that it is based on DirectX technology, with the X standing in for the particular API names [2]. The Xbox API was similar to Direct3D 8.1 and was developed jointly between Microsoft and Nvidia [3].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          2496,
+          2504
+        ],
+        "citation_supported": [
+          true,
+          false
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer correctly identifies the origin of the Xbox name as being based on DirectX technology, with the X representing the API names.",
+        "judge_error": false,
+        "latency_ms": 2143.1699999957345,
+        "cost_usd": 0.0006061180686950683
+      },
+      {
+        "id": "gddr6-001",
+        "kind": "factual",
+        "question": "What signalling does GDDR6X use, and what per-pin bandwidth does it reach?",
+        "reference_answer": "PAM4 signalling, for 19 to 21 Gbit/s per pin.",
+        "answer": "GDDR6X uses PAM4 signalling [1], allowing it to reach a per-pin bandwidth of 19–21 Gbit/s [1].",
+        "draft": "GDDR6X uses PAM4 signalling [1], allowing it to reach a per-pin bandwidth of 19–21 Gbit/s [1].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          2530
+        ],
+        "citation_supported": [
+          true
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer matches the reference, stating that GDDR6X uses PAM4 signalling and reaches a per-pin bandwidth of 19-21 Gbit/s.",
+        "judge_error": false,
+        "latency_ms": 1696.360400004778,
+        "cost_usd": 0.0005101951179504394
+      },
+      {
+        "id": "geforce-001",
+        "kind": "factual",
+        "question": "What did the GeForce name originally stand for?",
+        "reference_answer": "Geometry Force, because the GeForce 256 computed transform and lighting on the GPU.",
+        "answer": "The GeForce name originally stood for Geometry Force [1].",
+        "draft": "The GeForce name originally stood for Geometry Force [1].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          2534
+        ],
+        "citation_supported": [
+          true
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer matches the reference, stating that GeForce originally stood for Geometry Force.",
+        "judge_error": false,
+        "latency_ms": 1818.1228000321425,
+        "cost_usd": 0.0004404970359802246
+      },
+      {
+        "id": "gpgpu-001",
+        "kind": "factual",
+        "question": "How much last-level cache does the Pascal GPU have?",
+        "reference_answer": "4 MiB.",
+        "answer": "The Pascal GPU has 4 MiB last-level cache [1].",
+        "draft": "The Pascal GPU has 4 MiB last-level cache [1].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          2585
+        ],
+        "citation_supported": [
+          true
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer matches the reference answer exactly, stating the Pascal GPU has 4 MiB last-level cache.",
+        "judge_error": false,
+        "latency_ms": 1915.9489000448957,
+        "cost_usd": 0.0005499261474609375
+      },
+      {
+        "id": "gpgpu-002",
+        "kind": "factual",
+        "question": "What breakthrough for GPU computing happened in 2003?",
+        "reference_answer": "Two research groups independently found GPU approaches to general linear algebra that ran faster than on CPUs.",
+        "answer": "In 2003, two research groups independently discovered GPU-based approaches for the solution of general linear algebra problems on GPUs that ran faster than on CPUs [1]. Additionally, architectures like the ATI R300 and Nvidia NV40 introduced flexible control flow and branching [2].",
+        "draft": "In 2003, two research groups independently discovered GPU-based approaches for the solution of general linear algebra problems on GPUs that ran faster than on CPUs [1]. Additionally, architectures like the ATI R300 and Nvidia NV40 introduced flexible control flow and branching [2].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          2576,
+          3148
+        ],
+        "citation_supported": [
+          true,
+          false
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer states the key facts of the reference and adds extra detail that does not contradict it.",
+        "judge_error": false,
+        "latency_ms": 3586.7813999648206,
+        "cost_usd": 0.0006744556694030762
+      },
+      {
+        "id": "card-001",
+        "kind": "factual",
+        "question": "Why do manufacturers include support brackets with some high-end graphics cards?",
+        "reference_answer": "Heavy cards can sag after installation, and sag can damage the GPU over time.",
+        "answer": "Manufacturers include support brackets with some high-end graphics cards because they can be heavy enough to sag downwards after installation, which can damage the GPU in the long term [1].",
+        "draft": "Manufacturers include support brackets with some high-end graphics cards because they can be heavy enough to sag downwards after installation, which can damage the GPU in the long term [1].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          2625
+        ],
+        "citation_supported": [
+          true
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer matches the reference, explaining that heavy graphics cards can sag and potentially damage the GPU over time.",
+        "judge_error": false,
+        "latency_ms": 2837.546900031157,
+        "cost_usd": 0.0005118729553222657
+      },
+      {
+        "id": "pipeline-001",
+        "kind": "factual",
+        "question": "During rasterization, how is the visible fragment chosen when polygons overlap?",
+        "reference_answer": "Usually with a Z-buffer (hidden-surface determination).",
+        "answer": "During rasterization, the visible fragment is chosen using a Z-buffer for hidden-surface determination when polygons overlap [1].",
+        "draft": "During rasterization, the visible fragment is chosen using a Z-buffer for hidden-surface determination when polygons overlap [1].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          2662
+        ],
+        "citation_supported": [
+          true
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer matches the reference, stating that a Z-buffer is used for hidden-surface determination when polygons overlap.",
+        "judge_error": false,
+        "latency_ms": 1792.1423999941908,
+        "cost_usd": 0.0004706642456054687
+      },
+      {
+        "id": "gpu-001",
+        "kind": "factual",
+        "question": "How many GPUs were shipped worldwide in 2013?",
+        "reference_answer": "438.3 million.",
+        "answer": "In 2013, 438.3 million GPUs were shipped globally [1].",
+        "draft": "In 2013, 438.3 million GPUs were shipped globally [1].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          2696
+        ],
+        "citation_supported": [
+          true
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer matches the reference answer exactly, stating that 438.3 million GPUs were shipped worldwide in 2013.",
+        "judge_error": false,
+        "latency_ms": 2345.306899980642,
+        "cost_usd": 0.00044726725769042965
+      },
+      {
+        "id": "hbm-001",
+        "kind": "factual",
+        "question": "Which GPU was the first to use HBM?",
+        "reference_answer": "AMD Fiji, released in June 2015 in the Radeon R9 Fury X.",
+        "answer": "The first GPU using HBM was the AMD Fiji which was released in June 2015 powering the AMD Radeon R9 Fury X [1][2].",
+        "draft": "The first GPU using HBM was the AMD Fiji which was released in June 2015 powering the AMD Radeon R9 Fury X [1][2].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          2718,
+          2717
+        ],
+        "citation_supported": [
+          false,
+          true
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer matches the reference, stating that the AMD Fiji GPU was the first to use HBM and was released in June 2015 in the Radeon R9 Fury X.",
+        "judge_error": false,
+        "latency_ms": 2273.7650999915786,
+        "cost_usd": 0.0005671039543151856
+      },
+      {
+        "id": "hopper-001",
+        "kind": "factual",
+        "question": "What does the transformer engine in Hopper do?",
+        "reference_answer": "It dynamically drops computations from higher precision such as FP16 to faster lower precision such as FP8 when the accuracy loss is acceptable.",
+        "answer": "The transformer engine in Hopper accelerates computations by dynamically reducing them from higher numerical precisions to lower precisions when the loss in precision is deemed acceptable [1]. It is also capable of dynamically allocating bits in the chosen precision to either the mantissa or exponent at runtime to maximize precision [1].",
+        "draft": "The transformer engine in Hopper accelerates computations by dynamically reducing them from higher numerical precisions to lower precisions when the loss in precision is deemed acceptable [1]. It is also capable of dynamically allocating bits in the chosen precision to either the mantissa or exponent at runtime to maximize precision [1].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          2726
+        ],
+        "citation_supported": [
+          true
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer matches the key facts of the reference but adds extra detail about dynamically allocating bits, which does not contradict the reference.",
+        "judge_error": false,
+        "latency_ms": 2191.415600012988,
+        "cost_usd": 0.0005456069068908692
+      },
+      {
+        "id": "nvidia-001",
+        "kind": "factual",
+        "question": "Why did Nvidia's first graphics chip, the NV1, fail commercially?",
+        "reference_answer": "It rendered quadrilaterals, but Microsoft's Direct3D supported only triangles.",
+        "answer": "Nvidia's first graphics accelerator, the NV1, failed to gain traction in the market because Microsoft's DirectX platform chose not to support quadrilateral primitives and instead exclusively supported triangles [1].",
+        "draft": "Nvidia's first graphics accelerator, the NV1, failed to gain traction in the market because Microsoft's DirectX platform chose not to support quadrilateral primitives and instead exclusively supported triangles [1].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          2749
+        ],
+        "citation_supported": [
+          true
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer accurately states that the NV1's support for quadrilaterals was not compatible with Microsoft's Direct3D, which only supported triangles.",
+        "judge_error": false,
+        "latency_ms": 2032.205299998168,
+        "cost_usd": 0.0006365559310913086
+      },
+      {
+        "id": "nvlink-001",
+        "kind": "factual",
+        "question": "What real transfer rate did benchmarks measure for a 40 Gbit/s NVLink connection to a P100?",
+        "reference_answer": "About 35.3 Gbit/s host to device.",
+        "answer": "NVLink benchmarks show an achievable transfer rate of about 35.3 Gbit/s for a 40 Gbit/s NVLink connection towards a P100 GPU [1].",
+        "draft": "NVLink benchmarks show an achievable transfer rate of about 35.3 Gbit/s for a 40 Gbit/s NVLink connection towards a P100 GPU [1].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          2807
+        ],
+        "citation_supported": [
+          true
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer matches the key fact of the reference, stating a transfer rate of about 35.3 Gbit/s for a 40 Gbit/s NVLink connection to a P100.",
+        "judge_error": false,
+        "latency_ms": 2094.0253000007942,
+        "cost_usd": 0.0006092633056640625
+      },
+      {
+        "id": "opencl-001",
+        "kind": "factual",
+        "question": "Which operating system release shipped OpenCL 1.0?",
+        "reference_answer": "Mac OS X Snow Leopard, on August 28, 2009.",
+        "answer": "Mac OS X Snow Leopard shipped OpenCL 1.0 [1][3][4].",
+        "draft": "Mac OS X Snow Leopard shipped OpenCL 1.0 [1][3][4].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          2835,
+          2854,
+          2853
+        ],
+        "citation_supported": [
+          true,
+          false,
+          false
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer matches the key facts of the reference, stating the correct operating system release that shipped OpenCL 1.0.",
+        "judge_error": false,
+        "latency_ms": 2548.953799996525,
+        "cost_usd": 0.0006524205055236816
+      },
+      {
+        "id": "opengl-001",
+        "kind": "factual",
+        "question": "Which company created OpenGL, and when was it first released?",
+        "reference_answer": "Silicon Graphics (SGI); released on June 30, 1992.",
+        "answer": "Silicon Graphics, Inc. (SGI) created OpenGL, and it was first released on June 30, 1992 [1][3].",
+        "draft": "Silicon Graphics, Inc. (SGI) created OpenGL, and it was first released on June 30, 1992 [1][3].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          2873,
+          2891
+        ],
+        "citation_supported": [
+          true,
+          false
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer matches the reference, stating that Silicon Graphics created OpenGL and it was first released on June 30, 1992.",
+        "judge_error": false,
+        "latency_ms": 1765.08310000645,
+        "cost_usd": 0.00048584753036499023
+      },
+      {
+        "id": "pcie-001",
+        "kind": "factual",
+        "question": "How much power can a full-size x16 graphics card draw through the PCIe slot?",
+        "reference_answer": "Up to 75 W combined (66 W at +12 V) after configuration as a high-power device.",
+        "answer": "A full-sized x16 graphics card may draw up to 5.5 A at +12 V (66 W) and 75 W combined after initialization and software configuration as a high-power device [1].",
+        "draft": "A full-sized x16 graphics card may draw up to 5.5 A at +12 V (66 W) and 75 W combined after initialization and software configuration as a high-power device [1].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          2927
+        ],
+        "citation_supported": [
+          true
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer matches the key facts of the reference, including the power draw of 66 W at +12 V and 75 W combined, and only adds extra detail about the current and initialization process.",
+        "judge_error": false,
+        "latency_ms": 2225.872899987735,
+        "cost_usd": 0.0006526076545715332
+      },
+      {
+        "id": "radeon-001",
+        "kind": "factual",
+        "question": "How much did AMD pay to acquire ATI?",
+        "reference_answer": "US$5.4 billion, in 2006.",
+        "answer": "AMD paid $4.3 billion and 58 million shares of its stock, for approximately $5.4 billion to acquire ATI [2].",
+        "draft": "AMD paid $4.3 billion and 58 million shares of its stock, for approximately $5.4 billion to acquire ATI [2].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          2361
+        ],
+        "citation_supported": [
+          true
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer provides the same total value as the reference, although it breaks down the payment into cash and stock components.",
+        "judge_error": false,
+        "latency_ms": 1946.006199985277,
+        "cost_usd": 0.0005892925720214844
+      },
+      {
+        "id": "raytracing-001",
+        "kind": "factual",
+        "question": "Who first published on using a computer for ray tracing, and when?",
+        "reference_answer": "Arthur Appel, in 1968.",
+        "answer": "Arthur Appel first published on using a computer for ray tracing in 1968 [1].",
+        "draft": "Arthur Appel first published on using a computer for ray tracing in 1968 [1].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          3034
+        ],
+        "citation_supported": [
+          true
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer matches the reference answer, stating that Arthur Appel first published on using a computer for ray tracing in 1968.",
+        "judge_error": false,
+        "latency_ms": 1985.0799000123516,
+        "cost_usd": 0.000565883918762207
+      },
+      {
+        "id": "rocm-001",
+        "kind": "factual",
+        "question": "Which ROCm tool converts CUDA source code to HIP?",
+        "reference_answer": "HIPIFY, a source-to-source compiler.",
+        "answer": "HIPIFY is a source-to-source compiling tool that translates CUDA to HIP [1].",
+        "draft": "HIPIFY is a source-to-source compiling tool that translates CUDA to HIP [1].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          3093
+        ],
+        "citation_supported": [
+          true
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer matches the reference, stating that HIPIFY is a source-to-source compiler that converts CUDA to HIP.",
+        "judge_error": false,
+        "latency_ms": 1487.8416000283323,
+        "cost_usd": 0.00036005009460449215
+      },
+      {
+        "id": "shader-001",
+        "kind": "factual",
+        "question": "Who first introduced the term shader to the public?",
+        "reference_answer": "Pixar, in version 3.0 of the RenderMan Interface Specification (May 1988).",
+        "answer": "The term 'shader' was first introduced to the public by Pixar with version 3.0 of their RenderMan Interface Specification [1].",
+        "draft": "The term 'shader' was first introduced to the public by Pixar with version 3.0 of their RenderMan Interface Specification [1].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          3104
+        ],
+        "citation_supported": [
+          true
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer matches the reference, stating that Pixar introduced the term 'shader' with version 3.0 of the RenderMan Interface Specification.",
+        "judge_error": false,
+        "latency_ms": 2087.720800016541,
+        "cost_usd": 0.0005222106323242188
+      },
+      {
+        "id": "tpu-001",
+        "kind": "factual",
+        "question": "What clock speed does the first-generation TPU run at?",
+        "reference_answer": "700 MHz.",
+        "answer": "The first-generation TPU runs at a clock speed of 700 MHz [1].",
+        "draft": "The first-generation TPU runs at a clock speed of 700 MHz [1].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          3165
+        ],
+        "citation_supported": [
+          true
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer matches the reference answer exactly, stating the correct clock speed of 700 MHz.",
+        "judge_error": false,
+        "latency_ms": 1665.6977999955416,
+        "cost_usd": 0.0004918556022644043
+      },
+      {
+        "id": "vulkan-001",
+        "kind": "factual",
+        "question": "In what format do Vulkan drivers expect shaders?",
+        "reference_answer": "Pre-compiled SPIR-V, an intermediate binary format.",
+        "answer": "Vulkan drivers expect shaders in the intermediate binary format called SPIR-V (Standard Portable Intermediate Representation) [1].",
+        "draft": "Vulkan drivers expect shaders in the intermediate binary format called SPIR-V (Standard Portable Intermediate Representation) [1].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          3213
+        ],
+        "citation_supported": [
+          true
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer matches the reference, stating that Vulkan drivers expect shaders in the intermediate binary format called SPIR-V.",
+        "judge_error": false,
+        "latency_ms": 2063.179700053297,
+        "cost_usd": 0.00043497009658813475
+      },
+      {
+        "id": "multi-001",
+        "kind": "multi-hop",
+        "question": "Do Volta and Turing GPUs use the same manufacturing process?",
+        "reference_answer": "Yes. Both use TSMC's 12 nm FinFET process.",
+        "answer": "The Volta microarchitecture is produced with TSMC's 12 nm FinFET process [3]. The Turing architecture is also manufactured using TSMC's 12 nm FinFET semiconductor fabrication process [1].",
+        "draft": "The Volta microarchitecture is produced with TSMC's 12 nm FinFET process [3]. The Turing architecture is also manufactured using TSMC's 12 nm FinFET semiconductor fabrication process [1].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          3202,
+          3195
+        ],
+        "citation_supported": [
+          true,
+          true
+        ],
+        "invalid_citations": [],
+        "evidence_total": 2,
+        "evidence_cited": 2,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer states the key facts of the reference and nothing that contradicts it, confirming that both Volta and Turing GPUs use TSMC's 12 nm FinFET process.",
+        "judge_error": false,
+        "latency_ms": 2185.720000008587,
+        "cost_usd": 0.0005933637771606445
+      },
+      {
+        "id": "multi-002",
+        "kind": "multi-hop",
+        "question": "How did the transistor count grow from Volta to Blackwell's GB100 die?",
+        "reference_answer": "From 21.1 billion on Volta to 104 billion on GB100, roughly five times more.",
+        "answer": "The Volta architecture allowed 21.1 billion transistors [3], while the GB100 die contains 104 billion transistors [1], a nearly five-fold increase [1][3].",
+        "draft": "The Volta architecture allowed 21.1 billion transistors [3], while the GB100 die contains 104 billion transistors [1], a nearly five-fold increase [1][3].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          3203,
+          2441
+        ],
+        "citation_supported": [
+          true,
+          true
+        ],
+        "invalid_citations": [],
+        "evidence_total": 2,
+        "evidence_cited": 2,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer accurately states the transistor count on Volta and GB100, and correctly describes the increase as nearly five-fold.",
+        "judge_error": false,
+        "latency_ms": 2157.196299987845,
+        "cost_usd": 0.0005916859397888184
+      },
+      {
+        "id": "multi-003",
+        "kind": "multi-hop",
+        "question": "HBM development started at which company, and where is that company headquartered?",
+        "reference_answer": "AMD, headquartered in Santa Clara, California.",
+        "answer": "The development of High Bandwidth Memory began at AMD [1]. AMD is headquartered in Santa Clara, California, but this information is not present in the sources, so the answer to the second part of the question cannot be provided [1].",
+        "draft": "The development of High Bandwidth Memory began at AMD [1]. AMD is headquartered in Santa Clara, California, but this information is not present in the sources, so the answer to the second part of the question cannot be provided [1].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          2717
+        ],
+        "citation_supported": [
+          true
+        ],
+        "invalid_citations": [],
+        "evidence_total": 2,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "partial",
+        "judge_reason": "The answer correctly identifies AMD as the company where HBM development started, but fails to confirm the headquarters location as it is not present in the sources.",
+        "judge_error": false,
+        "latency_ms": 2444.370999990497,
+        "cost_usd": 0.0005581740913391113
+      },
+      {
+        "id": "multi-004",
+        "kind": "multi-hop",
+        "question": "When was the company that makes CUDA founded?",
+        "reference_answer": "CUDA is made by Nvidia, founded on April 5, 1993.",
+        "answer": "The company that makes CUDA, Nvidia, went public on January 22, 1999 [3].",
+        "draft": "The company that makes CUDA, Nvidia, went public on January 22, 1999 [3].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          2738
+        ],
+        "citation_supported": [
+          false
+        ],
+        "invalid_citations": [],
+        "evidence_total": 2,
+        "evidence_cited": 0,
+        "plain_text_reply": false,
+        "verdict": "incorrect",
+        "judge_reason": "The answer provides the date Nvidia went public instead of the date it was founded.",
+        "judge_error": false,
+        "latency_ms": 1713.3297999971546,
+        "cost_usd": 0.0005830034408569335
+      },
+      {
+        "id": "multi-005",
+        "kind": "multi-hop",
+        "question": "Which memory does the GeForce RTX 3090 use, and who developed that memory?",
+        "reference_answer": "GDDR6X, developed by Micron in close collaboration with Nvidia.",
+        "answer": "The GeForce RTX 3090 uses GDDR6X memory [1][2]. The developer of the GDDR6X memory is not specified in the sources [1][2].",
+        "draft": "The GeForce RTX 3090 uses GDDR6X memory [1][2]. The developer of the GDDR6X memory is not specified in the sources [1][2].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          2557,
+          2430
+        ],
+        "citation_supported": [
+          false,
+          true
+        ],
+        "invalid_citations": [],
+        "evidence_total": 2,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "partial",
+        "judge_reason": "The answer correctly identifies the memory type as GDDR6X but fails to mention its developer, which is a key fact in the reference answer.",
+        "judge_error": false,
+        "latency_ms": 2243.55579999974,
+        "cost_usd": 0.0006435962600708008
+      },
+      {
+        "id": "multi-006",
+        "kind": "multi-hop",
+        "question": "Which organization maintains both OpenGL and OpenCL?",
+        "reference_answer": "The Khronos Group, a non-profit consortium.",
+        "answer": "The Khronos Group maintains OpenCL [1][2][3][4][5] and also maintains OpenGL, as indicated by improved OpenGL interoperability in OpenCL 1.1 [4].",
+        "draft": "The Khronos Group maintains OpenCL [1][2][3][4][5] and also maintains OpenGL, as indicated by improved OpenGL interoperability in OpenCL 1.1 [4].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          2816,
+          2834,
+          2578,
+          2836,
+          2818
+        ],
+        "citation_supported": [
+          true,
+          false,
+          false,
+          false,
+          false
+        ],
+        "invalid_citations": [],
+        "evidence_total": 2,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer correctly identifies The Khronos Group as the maintainer of both OpenGL and OpenCL, and also provides additional relevant information about OpenCL 1.1.",
+        "judge_error": false,
+        "latency_ms": 2712.265800044406,
+        "cost_usd": 0.0005497376976013183
+      },
+      {
+        "id": "none-001",
+        "kind": "unanswerable",
+        "question": "Who won the 2022 FIFA World Cup?",
+        "reference_answer": "Not answerable from these documents.",
+        "answer": "",
+        "draft": "",
+        "refusal_reason": "model",
+        "blocked_by": null,
+        "cited_chunk_ids": [],
+        "citation_supported": [],
+        "invalid_citations": [],
+        "evidence_total": 0,
+        "evidence_cited": 0,
+        "plain_text_reply": false,
+        "verdict": null,
+        "judge_reason": "",
+        "judge_error": false,
+        "latency_ms": 2666.8153000064194,
+        "cost_usd": 0.0004542375946044922
+      },
+      {
+        "id": "none-002",
+        "kind": "unanswerable",
+        "question": "At what temperature does liquid helium boil?",
+        "reference_answer": "Not answerable from these documents (helium is mentioned only as a coolant in an overclocking record).",
+        "answer": "",
+        "draft": "",
+        "refusal_reason": "model",
+        "blocked_by": null,
+        "cited_chunk_ids": [],
+        "citation_supported": [],
+        "invalid_citations": [],
+        "evidence_total": 0,
+        "evidence_cited": 0,
+        "plain_text_reply": false,
+        "verdict": null,
+        "judge_reason": "",
+        "judge_error": false,
+        "latency_ms": 1702.2588000399992,
+        "cost_usd": 0.0004900255699157714
+      },
+      {
+        "id": "none-003",
+        "kind": "unanswerable",
+        "question": "How much video memory does the Intel Arc A770 have?",
+        "reference_answer": "Not answerable from these documents.",
+        "answer": "",
+        "draft": "",
+        "refusal_reason": "model",
+        "blocked_by": null,
+        "cited_chunk_ids": [],
+        "citation_supported": [],
+        "invalid_citations": [],
+        "evidence_total": 0,
+        "evidence_cited": 0,
+        "plain_text_reply": false,
+        "verdict": null,
+        "judge_reason": "",
+        "judge_error": false,
+        "latency_ms": 1470.5318000051193,
+        "cost_usd": 0.0004785851402282715
+      },
+      {
+        "id": "none-004",
+        "kind": "unanswerable",
+        "question": "What is the flagship GPU made by Moore Threads?",
+        "reference_answer": "Not answerable from these documents.",
+        "answer": "",
+        "draft": "",
+        "refusal_reason": "model",
+        "blocked_by": null,
+        "cited_chunk_ids": [],
+        "citation_supported": [],
+        "invalid_citations": [],
+        "evidence_total": 0,
+        "evidence_cited": 0,
+        "plain_text_reply": false,
+        "verdict": null,
+        "judge_reason": "",
+        "judge_error": false,
+        "latency_ms": 1659.7669000038877,
+        "cost_usd": 0.0005542680053710938
+      }
+    ],
+    "judge_cost_usd": 0.006866311269760129
+  }
+}

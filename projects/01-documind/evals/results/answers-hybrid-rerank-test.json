@@ -1,0 +1,542 @@
+{
+  "prompt_version": "v2",
+  "judge_version": "v1",
+  "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+  "retriever": "hybrid-rerank",
+  "split": "test",
+  "context_chunks": 5,
+  "created_at": "2026-11-18T03:20:10.670974Z",
+  "report": {
+    "cases": [
+      {
+        "id": "amd-003",
+        "kind": "factual",
+        "question": "What clock-speed world record did AMD set in 2011, and with which processor?",
+        "reference_answer": "8.429 GHz with an FX-8150 cooled by liquid helium.",
+        "answer": "AMD set a clock-speed world record of 8.429 GHz in 2011 with an 8-core FX-8150 processor [1].",
+        "draft": "AMD set a clock-speed world record of 8.429 GHz in 2011 with an 8-core FX-8150 processor [1].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          2425
+        ],
+        "citation_supported": [
+          true
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer matches the reference, stating the correct clock-speed and processor model, and only adds a non-contradictory detail about the number of cores.",
+        "judge_error": false,
+        "latency_ms": 2855.8988999575377,
+        "cost_usd": 0.0006173597259521484
+      },
+      {
+        "id": "blackwell-002",
+        "kind": "factual",
+        "question": "Who is the Blackwell GPU architecture named after?",
+        "reference_answer": "Statistician and mathematician David Blackwell.",
+        "answer": "The Blackwell GPU architecture is named after American mathematician David Blackwell [1][2][3][5].",
+        "draft": "The Blackwell GPU architecture is named after American mathematician David Blackwell [1][2][3][5].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          2436,
+          2437,
+          2759,
+          2438
+        ],
+        "citation_supported": [
+          true,
+          false,
+          false,
+          false
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer matches the key fact of the reference, stating that the Blackwell GPU architecture is named after David Blackwell, with only a minor addition of his nationality.",
+        "judge_error": false,
+        "latency_ms": 2283.506400010083,
+        "cost_usd": 0.0005446808967590332
+      },
+      {
+        "id": "geforce-002",
+        "kind": "factual",
+        "question": "How was the GeForce 256 marketed when it launched in 1999?",
+        "reference_answer": "As the world's first graphics processing unit.",
+        "answer": "The GeForce 256 was marketed as the 'world's first graphics processing unit' when it launched in August 1999 [1][3].",
+        "draft": "The GeForce 256 was marketed as the 'world's first graphics processing unit' when it launched in August 1999 [1][3].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          2535,
+          2687
+        ],
+        "citation_supported": [
+          true,
+          false
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer matches the reference, stating that the GeForce 256 was marketed as the world's first graphics processing unit.",
+        "judge_error": false,
+        "latency_ms": 1790.5244000139646,
+        "cost_usd": 0.0005312103614807128
+      },
+      {
+        "id": "hbm-002",
+        "kind": "factual",
+        "question": "When and where did High Bandwidth Memory development begin?",
+        "reference_answer": "At AMD, in 2008.",
+        "answer": "The development of High Bandwidth Memory began at AMD in 2008 [1].",
+        "draft": "The development of High Bandwidth Memory began at AMD in 2008 [1].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          2717
+        ],
+        "citation_supported": [
+          true
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer matches the reference answer, stating that High Bandwidth Memory development began at AMD in 2008.",
+        "judge_error": false,
+        "latency_ms": 1808.2149000256322,
+        "cost_usd": 0.0004871621055603027
+      },
+      {
+        "id": "hopper-002",
+        "kind": "factual",
+        "question": "Which Hopper-based product was caught up in US–China trade disputes in 2026?",
+        "reference_answer": "The H200 AI accelerator.",
+        "answer": "The Hopper-based H200 AI accelerator was caught up in US–China trade disputes in 2026 [1][2].",
+        "draft": "The Hopper-based H200 AI accelerator was caught up in US–China trade disputes in 2026 [1][2].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          2732,
+          2802
+        ],
+        "citation_supported": [
+          true,
+          false
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer matches the reference, stating the H200 AI accelerator was the Hopper-based product caught up in US-China trade disputes in 2026.",
+        "judge_error": false,
+        "latency_ms": 1936.8971000076272,
+        "cost_usd": 0.0005350122146606445
+      },
+      {
+        "id": "opengl-002",
+        "kind": "factual",
+        "question": "What was the codename of OpenGL 3.0 before its release?",
+        "reference_answer": "Longs Peak.",
+        "answer": "The codename of OpenGL 3.0 before its release was Longs Peak [1][2].",
+        "draft": "The codename of OpenGL 3.0 before its release was Longs Peak [1][2].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          2894,
+          2895
+        ],
+        "citation_supported": [
+          true,
+          false
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer matches the reference answer, stating that the codename of OpenGL 3.0 before its release was indeed Longs Peak.",
+        "judge_error": false,
+        "latency_ms": 2077.205399982631,
+        "cost_usd": 0.0004994003105163574
+      },
+      {
+        "id": "pcie-002",
+        "kind": "factual",
+        "question": "Which modulation does PCI Express 6.0 use?",
+        "reference_answer": "PAM-4 (4-level pulse-amplitude modulation) with low-latency forward error correction.",
+        "answer": "PCI Express 6.0 uses 4-level pulse-amplitude modulation (PAM-4) [1][2].",
+        "draft": "PCI Express 6.0 uses 4-level pulse-amplitude modulation (PAM-4) [1][2].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          2958,
+          2959
+        ],
+        "citation_supported": [
+          true,
+          false
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "partial",
+        "judge_reason": "The answer correctly identifies the modulation used by PCI Express 6.0 as PAM-4, but does not mention the low-latency forward error correction.",
+        "judge_error": false,
+        "latency_ms": 2731.7791000241414,
+        "cost_usd": 0.0005981751441955566
+      },
+      {
+        "id": "rocm-002",
+        "kind": "factual",
+        "question": "When was ROCm launched?",
+        "reference_answer": "Around 2016, with the Boltzmann Initiative.",
+        "answer": "ROCm was launched around 2016 [1][2][3][5]",
+        "draft": "ROCm was launched around 2016 [1][2][3][5]",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          3074,
+          2578,
+          2849,
+          3073
+        ],
+        "citation_supported": [
+          true,
+          false,
+          false,
+          false
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer matches the key fact of the reference answer, which is the launch year of ROCm.",
+        "judge_error": false,
+        "latency_ms": 1752.7758000069298,
+        "cost_usd": 0.00046789527893066407
+      },
+      {
+        "id": "shader-002",
+        "kind": "factual",
+        "question": "Which API versions introduced geometry shaders?",
+        "reference_answer": "Direct3D 10 and OpenGL 3.2.",
+        "answer": "Geometry shaders were introduced in Direct3D 10 and OpenGL 3.2 [1][2]. They were also available in OpenGL 2.0+ with the use of extensions [2].",
+        "draft": "Geometry shaders were introduced in Direct3D 10 and OpenGL 3.2 [1][2]. They were also available in OpenGL 2.0+ with the use of extensions [2].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          3104,
+          3107
+        ],
+        "citation_supported": [
+          false,
+          true
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "partial",
+        "judge_reason": "The answer includes the correct API versions that introduced geometry shaders, but also mentions an additional detail about OpenGL 2.0+ that is not present in the reference answer.",
+        "judge_error": false,
+        "latency_ms": 2191.806400020141,
+        "cost_usd": 0.0005624454116821289
+      },
+      {
+        "id": "simt-001",
+        "kind": "factual",
+        "question": "Which Nvidia chip introduced the SIMT execution model?",
+        "reference_answer": "The G80, in the Tesla microarchitecture.",
+        "answer": "The Tesla GPU microarchitecture with the G80 chip introduced the SIMT execution model [1].",
+        "draft": "The Tesla GPU microarchitecture with the G80 chip introduced the SIMT execution model [1].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          3122
+        ],
+        "citation_supported": [
+          true
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer correctly identifies the G80 chip in the Tesla microarchitecture as the introduction of the SIMT execution model, with only minor wording differences from the reference.",
+        "judge_error": false,
+        "latency_ms": 1967.2322999686003,
+        "cost_usd": 0.0004825741424560547
+      },
+      {
+        "id": "stream-001",
+        "kind": "factual",
+        "question": "Why does the Cell processor behave like a MIMD machine?",
+        "reference_answer": "Each SPE has its own instruction memory and program counter.",
+        "answer": "The Cell processor behaves as a multiple instruction, multiple data (MIMD) environment because each Synergistic Processing Element (SPE) possesses an independent instruction memory space and program counter [1].",
+        "draft": "The Cell processor behaves as a multiple instruction, multiple data (MIMD) environment because each Synergistic Processing Element (SPE) possesses an independent instruction memory space and program counter [1].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          3150
+        ],
+        "citation_supported": [
+          true
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer correctly states that each SPE has its own instruction memory and program counter, which is the key fact that makes the Cell processor behave like a MIMD machine.",
+        "judge_error": false,
+        "latency_ms": 2047.262599982787,
+        "cost_usd": 0.0005691923446655273
+      },
+      {
+        "id": "tdp-001",
+        "kind": "factual",
+        "question": "What does a chip's thermal design power describe?",
+        "reference_answer": "The maximum heat a component can generate that its cooling system is designed to dissipate at base clock.",
+        "answer": "A chip's thermal design power describes the maximum amount of heat that a computer component can generate and that its cooling system is designed to dissipate during normal operation at a non-turbo clock rate [1]. It is the maximum amount of heat that a processor can produce when running real life applications [3].",
+        "draft": "A chip's thermal design power describes the maximum amount of heat that a computer component can generate and that its cooling system is designed to dissipate during normal operation at a non-turbo clock rate [1]. It is the maximum amount of heat that a processor can produce when running real life applications [3].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          3181,
+          3192
+        ],
+        "citation_supported": [
+          true,
+          false
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer accurately describes the thermal design power as the maximum heat a component can generate that its cooling system is designed to dissipate, with only minor wording differences from the reference.",
+        "judge_error": false,
+        "latency_ms": 2573.4124000300653,
+        "cost_usd": 0.0005970477180480957
+      },
+      {
+        "id": "tpu-002",
+        "kind": "factual",
+        "question": "How did Singular Computing's patent lawsuit against Google over TPUs end?",
+        "reference_answer": "Google agreed to a settlement with undisclosed terms in January 2024.",
+        "answer": "Singular Computing's patent lawsuit against Google over TPUs ended in a settlement with undisclosed terms in January 2024 [1].",
+        "draft": "Singular Computing's patent lawsuit against Google over TPUs ended in a settlement with undisclosed terms in January 2024 [1].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          3180
+        ],
+        "citation_supported": [
+          true
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer matches the reference answer, stating that the lawsuit ended in a settlement with undisclosed terms in January 2024.",
+        "judge_error": false,
+        "latency_ms": 1732.3307000333443,
+        "cost_usd": 0.0005153581237792969
+      },
+      {
+        "id": "turing-001",
+        "kind": "factual",
+        "question": "At which event was the Turing architecture first introduced?",
+        "reference_answer": "SIGGRAPH 2018, in August 2018, in Quadro RTX cards.",
+        "answer": "The Turing architecture was first introduced at SIGGRAPH 2018 [1][4].",
+        "draft": "The Turing architecture was first introduced at SIGGRAPH 2018 [1][4].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          3195,
+          2554
+        ],
+        "citation_supported": [
+          true,
+          false
+        ],
+        "invalid_citations": [],
+        "evidence_total": 1,
+        "evidence_cited": 1,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer matches the reference answer by stating the Turing architecture was first introduced at SIGGRAPH 2018, and does not include any contradictory information.",
+        "judge_error": false,
+        "latency_ms": 1543.864500010386,
+        "cost_usd": 0.0005710585899353027
+      },
+      {
+        "id": "multi-007",
+        "kind": "multi-hop",
+        "question": "Which architecture succeeded Volta, and when was it officially announced?",
+        "reference_answer": "Ampere, announced on May 14, 2020.",
+        "answer": "The Ampere microarchitecture is the successor to Volta [1][3]. It was officially announced on May 14, 2020 [3].",
+        "draft": "The Ampere microarchitecture is the successor to Volta [1][3]. It was officially announced on May 14, 2020 [3].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          3202,
+          2429
+        ],
+        "citation_supported": [
+          true,
+          true
+        ],
+        "invalid_citations": [],
+        "evidence_total": 2,
+        "evidence_cited": 2,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer matches the reference, stating that Ampere succeeded Volta and was announced on May 14, 2020.",
+        "judge_error": false,
+        "latency_ms": 2130.8962000184692,
+        "cost_usd": 0.0005518500480651855
+      },
+      {
+        "id": "multi-008",
+        "kind": "multi-hop",
+        "question": "Which company released the R600 to compete with Nvidia's G80, and how much was that company bought for?",
+        "reference_answer": "ATI Technologies, bought by AMD in 2006 for US$5.4 billion.",
+        "answer": "",
+        "draft": "",
+        "refusal_reason": "model",
+        "blocked_by": null,
+        "cited_chunk_ids": [],
+        "citation_supported": [],
+        "invalid_citations": [],
+        "evidence_total": 2,
+        "evidence_cited": 0,
+        "plain_text_reply": false,
+        "verdict": null,
+        "judge_reason": "",
+        "judge_error": false,
+        "latency_ms": 1783.1507999799214,
+        "cost_usd": 0.0005589615020751953
+      },
+      {
+        "id": "multi-009",
+        "kind": "multi-hop",
+        "question": "Which architecture succeeded Hopper, and who was Hopper named after?",
+        "reference_answer": "Blackwell; Hopper is named after computer scientist and US Navy rear admiral Grace Hopper.",
+        "answer": "The Blackwell architecture succeeded Hopper [3][4][5]. Hopper was named after computer scientist and United States Navy rear admiral Grace Hopper [1][2].",
+        "draft": "The Blackwell architecture succeeded Hopper [3][4][5]. Hopper was named after computer scientist and United States Navy rear admiral Grace Hopper [1][2].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          2429,
+          2437,
+          2436,
+          2729,
+          2719
+        ],
+        "citation_supported": [
+          false,
+          false,
+          true,
+          true,
+          true
+        ],
+        "invalid_citations": [],
+        "evidence_total": 2,
+        "evidence_cited": 2,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer matches the reference, stating that the Blackwell architecture succeeded Hopper and that Hopper was named after computer scientist and US Navy rear admiral Grace Hopper.",
+        "judge_error": false,
+        "latency_ms": 2013.7757000047714,
+        "cost_usd": 0.0005170592498779297
+      },
+      {
+        "id": "multi-010",
+        "kind": "multi-hop",
+        "question": "Which Nvidia architecture first had Tensor Cores, and which generation of Tensor Cores does Ampere have?",
+        "reference_answer": "Volta was first; Ampere has third-generation Tensor Cores.",
+        "answer": "The Nvidia Volta architecture was the first to feature Tensor Cores [1][3], and the Ampere architecture has third-generation Tensor Cores [4].",
+        "draft": "The Nvidia Volta architecture was the first to feature Tensor Cores [1][3], and the Ampere architecture has third-generation Tensor Cores [4].",
+        "refusal_reason": null,
+        "blocked_by": null,
+        "cited_chunk_ids": [
+          3202,
+          3203,
+          2430
+        ],
+        "citation_supported": [
+          true,
+          false,
+          true
+        ],
+        "invalid_citations": [],
+        "evidence_total": 2,
+        "evidence_cited": 2,
+        "plain_text_reply": false,
+        "verdict": "correct",
+        "judge_reason": "The answer matches the reference, stating that Volta was the first Nvidia architecture with Tensor Cores and that Ampere has third-generation Tensor Cores.",
+        "judge_error": false,
+        "latency_ms": 2688.7624000082724,
+        "cost_usd": 0.0006415194931030273
+      },
+      {
+        "id": "none-005",
+        "kind": "unanswerable",
+        "question": "How large is the Cerebras wafer-scale engine?",
+        "reference_answer": "Not answerable from these documents.",
+        "answer": "",
+        "draft": "",
+        "refusal_reason": "model",
+        "blocked_by": null,
+        "cited_chunk_ids": [],
+        "citation_supported": [],
+        "invalid_citations": [],
+        "evidence_total": 0,
+        "evidence_cited": 0,
+        "plain_text_reply": false,
+        "verdict": null,
+        "judge_reason": "",
+        "judge_error": false,
+        "latency_ms": 1366.1119000171311,
+        "cost_usd": 0.00040319567108154295
+      },
+      {
+        "id": "none-006",
+        "kind": "unanswerable",
+        "question": "What is the monthly electricity bill for gaming on an RTX 4090?",
+        "reference_answer": "Not answerable from these documents.",
+        "answer": "",
+        "draft": "",
+        "refusal_reason": "model",
+        "blocked_by": null,
+        "cited_chunk_ids": [],
+        "citation_supported": [],
+        "invalid_citations": [],
+        "evidence_total": 0,
+        "evidence_cited": 0,
+        "plain_text_reply": false,
+        "verdict": null,
+        "judge_reason": "",
+        "judge_error": false,
+        "latency_ms": 1670.7377000129782,
+        "cost_usd": 0.0005076262664794922
+      }
+    ],
+    "judge_cost_usd": 0.003343614749908448
+  }
+}
