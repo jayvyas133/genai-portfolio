@@ -94,7 +94,11 @@ async def test_full_run_plans_researches_in_parallel_writes_and_gets_approved() 
     )
     search = FakeSearch(_hits("a#0", "b#0"))
     events: list[ProgressEvent] = []
-    report = await _researcher(provider, search).run("Question?", on_event=events.append)
+
+    async def record(event: ProgressEvent) -> None:
+        events.append(event)
+
+    report = await _researcher(provider, search).run("Question?", on_event=record)
 
     assert report.text == "A happened [1]. B happened [2]."
     assert report.outline == ["Sub A", "Sub B"]

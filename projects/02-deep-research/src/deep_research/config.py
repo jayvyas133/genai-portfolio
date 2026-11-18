@@ -17,7 +17,7 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 class DeepResearchSettings(BaseSettings):
-    """Settings for search and evals.
+    """Settings for search, agents, evals and the research service.
 
     Example: ``DEEP_RESEARCH_SEARCH_K=8`` sets ``search_k`` to 8.
     """
@@ -43,6 +43,20 @@ class DeepResearchSettings(BaseSettings):
     queries_per_sub_question: int = Field(default=2, ge=1, le=5)
     passages_per_sub_question: int = Field(default=4, ge=1, le=10)
     max_revisions: int = Field(default=1, ge=0, le=3)
+
+    # Research service (API + worker), see jobs.py and worker.py.
+    redis_url: str = "redis://localhost:6379/0"
+    # Jobs one worker process runs at once. 1 suits a local Ollama, which
+    # serves one request at a time anyway; raise it for a hosted model.
+    worker_concurrency: int = Field(default=1, ge=1, le=16)
+    # Queued + running jobs; past it the API answers 429 (back-pressure)
+    # instead of letting the queue grow without bound.
+    max_pending_jobs: int = Field(default=20, ge=1)
+    # Hard cap on one job's run time. A 3B local model takes ~4 minutes
+    # per report (ADR 0016), so 15 minutes only stops runaway jobs.
+    job_timeout_s: float = Field(default=900.0, gt=0)
+    # How long finished jobs (and their reports and events) are kept.
+    result_ttl_s: int = Field(default=86_400, gt=0)
 
     def agent_limits(self) -> AgentLimits:
         """The agent budgets as one object."""

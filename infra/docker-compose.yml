@@ -20,10 +20,18 @@ services:
 
   redis:
     image: redis:7-alpine
+    # AOF (append-only file): Deep Research keeps its job queue here, so
+    # queued jobs must survive a Redis restart (fsync every second).
+    command: ["redis-server", "--appendonly", "yes"]
     ports:
       - "6379:6379"
     volumes:
       - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   # Langfuse v2 (Postgres-only). v3 additionally needs ClickHouse + S3/MinIO.
   langfuse:
@@ -56,6 +64,42 @@ services:
       DOCUMIND_DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/documind
     ports:
       - "8000:8000"
+
+  # Deep Research (projects/02-deep-research): the API queues jobs in
+  # Redis, the worker runs them. `docker compose up deep-research-worker`
+  # starts Redis, the API and the worker.
+  deep-research-api:
+    build:
+      context: ..
+      dockerfile: projects/02-deep-research/Dockerfile
+    image: ai-portfolio/deep-research
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      DEEP_RESEARCH_REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8001:8000"
+
+  deep-research-worker:
+    image: ai-portfolio/deep-research
+    command: ["deep-research", "worker"]
+    depends_on:
+      redis:
+        condition: service_healthy
+      deep-research-api:
+        condition: service_started
+    env_file:
+      - path: ../.env
+        required: false
+    environment:
+      DEEP_RESEARCH_REDIS_URL: redis://redis:6379/0
+      # Ollama runs on the host, not in the compose network.
+      AICORE_OLLAMA_BASE_URL: http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # A crashed worker is restarted; its unfinished job is reclaimed from Redis.
+    restart: unless-stopped
 
 volumes:
   pgdata:

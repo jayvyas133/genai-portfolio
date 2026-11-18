@@ -32,7 +32,7 @@ one rewrite per revision): 7 with the defaults.
 """
 
 import operator
-from collections.abc import Callable, Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from typing import Annotated, TypedDict
 
 from aicore.client import LLMClient
@@ -133,6 +133,10 @@ class ProgressEvent(BaseModel):
     message: str
 
 
+OnEvent = Callable[[ProgressEvent], Awaitable[None]]
+"""Called with each finished step, e.g. to print it or publish it to a job's event stream."""
+
+
 class ResearchState(TypedDict, total=False):
     """The graph's shared state. ``findings`` merges the parallel branches' outputs."""
 
@@ -223,10 +227,8 @@ class AgentResearcher:
         """
         return await self.run(question)
 
-    async def run(
-        self, question: str, on_event: Callable[[ProgressEvent], None] | None = None
-    ) -> Report:
-        """Research ``question``, calling ``on_event`` after each step finishes."""
+    async def run(self, question: str, on_event: OnEvent | None = None) -> Report:
+        """Research ``question``, awaiting ``on_event`` after each step finishes."""
         state: ResearchState = {"question": question, "findings": [], "revisions": 0}
         final: ResearchState = state
         async for mode, chunk in self.graph.astream(state, stream_mode=["updates", "values"]):
@@ -234,7 +236,7 @@ class AgentResearcher:
                 final = chunk  # type: ignore[assignment]
             elif on_event is not None:
                 for node, update in chunk.items():  # type: ignore[union-attr]
-                    on_event(describe(node, update))
+                    await on_event(describe(node, update))
         return Report(
             question=question,
             text=final.get("report", ""),

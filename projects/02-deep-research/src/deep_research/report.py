@@ -11,6 +11,7 @@ separate citation list that could disagree with the text.
 
 import re
 from collections.abc import Awaitable, Callable
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -36,6 +37,9 @@ class Report(BaseModel):
 
 Researcher = Callable[[str], Awaitable[Report]]
 """Anything that turns a question into a report: the thing the eval runs."""
+
+ResearcherName = Literal["single-shot", "agents"]
+"""The built-in researchers, as named on the command line and in the API."""
 
 
 class Claim(BaseModel):

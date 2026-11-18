@@ -7,11 +7,11 @@ environment variables or ``.env`` (``DEEP_RESEARCH_*`` for this project,
 
 import argparse
 import asyncio
+import contextlib
 import logging
 import time
 from collections.abc import Sequence
 from datetime import UTC, datetime
-from typing import Literal
 
 from aicore.client import LLMClient
 from aicore.config import LLMSettings
@@ -19,16 +19,17 @@ from aicore.errors import LLMError
 from aicore.providers.factory import build_client
 from aicore.tracing import InMemoryTracer
 
-from deep_research.agents import AGENT_PROMPT_VERSION, AgentResearcher, ProgressEvent
+from deep_research.agents import AGENT_PROMPT_VERSION, AgentResearcher, OnEvent, ProgressEvent
 from deep_research.baseline import SingleShotResearcher
 from deep_research.config import DeepResearchSettings
 from deep_research.corpus import TITLES, fetch_documents, load_documents
 from deep_research.evaluate import JUDGE_VERSION, EvalRun, evaluate, format_run
 from deep_research.golden import Split, check_quotes, load_golden
+from deep_research.jobs import JobStore, connect
+from deep_research.report import Report, ResearcherName
 from deep_research.search import CorpusSearch
+from deep_research.worker import Worker
 from deep_research.writer import WRITER_PROMPT_VERSION
-
-ResearcherName = Literal["single-shot", "agents"]
 
 logger = logging.getLogger("deep_research")
 
@@ -47,7 +48,7 @@ def build_researcher(
     return SingleShotResearcher(search, client, settings.search_k)
 
 
-def _print_event(event: ProgressEvent) -> None:
+async def _print_event(event: ProgressEvent) -> None:
     """Show one agent step as it finishes."""
     print(f"  [{event.node}] {event.message}", flush=True)
 
@@ -138,6 +139,37 @@ async def run_eval(
     print(f"\nSaved {path}")
 
 
+async def run_worker(settings: DeepResearchSettings, llm: LLMSettings) -> None:
+    """Run research jobs from the Redis queue until stopped."""
+    client = build_client(llm)
+    search = _search(settings)
+    researchers = {
+        name: build_researcher(name, search, client, settings) for name in ("single-shot", "agents")
+    }
+
+    async def research(question: str, name: ResearcherName, on_event: OnEvent) -> Report:
+        researcher = researchers[name]
+        if isinstance(researcher, AgentResearcher):
+            return await researcher.run(question, on_event=on_event)
+        return await researcher(question)
+
+    redis = connect(settings.redis_url)
+    store = JobStore(
+        redis, max_pending=settings.max_pending_jobs, result_ttl_s=settings.result_ttl_s
+    )
+    worker = Worker(
+        store,
+        research,
+        concurrency=settings.worker_concurrency,
+        job_timeout_s=settings.job_timeout_s,
+    )
+    try:
+        await worker.run()
+    finally:
+        await redis.aclose()
+        await client.aclose()
+
+
 def build_parser() -> argparse.ArgumentParser:
     """The ``deep-research`` argument parser."""
     parser = argparse.ArgumentParser(prog="deep-research", description=__doc__)
@@ -152,6 +184,8 @@ def build_parser() -> argparse.ArgumentParser:
     ask = sub.add_parser("ask", help="research a question and print a cited report")
     ask.add_argument("question")
     ask.add_argument("--researcher", choices=["single-shot", "agents"], default="agents")
+
+    sub.add_parser("worker", help="run research jobs from the Redis queue (for the API)")
 
     ev = sub.add_parser("eval", help="score the researcher on the golden dataset")
     ev.add_argument("--researcher", choices=["single-shot", "agents"], default="agents")
@@ -177,6 +211,11 @@ def main(argv: Sequence[str] | None = None) -> None:
                 asyncio.run(run_search(settings, args.query, args.k))
             case "ask":
                 asyncio.run(run_ask(settings, LLMSettings(), args.question, args.researcher))
+            case "worker":
+                logging.getLogger("deep_research").setLevel(logging.INFO)
+                # SIGTERM or Ctrl+C cancels the worker: a normal stop, not an error.
+                with contextlib.suppress(KeyboardInterrupt, asyncio.CancelledError):
+                    asyncio.run(run_worker(settings, LLMSettings()))
             case "eval":
                 asyncio.run(
                     run_eval(
