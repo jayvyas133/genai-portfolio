@@ -1,0 +1,181 @@
+{
+  "researcher": "single-shot",
+  "model": "qwen2.5:3b",
+  "judge_model": "qwen2.5:3b",
+  "writer_prompt_version": "v1",
+  "judge_version": "v1",
+  "split": "dev",
+  "search_k": 5,
+  "max_claims": 3,
+  "created_at": "2026-11-18T05:40:12.096961Z",
+  "cases": [
+    {
+      "id": "dr-001",
+      "question": "Compare Chandrayaan-3 and Luna 25, which both tried to land near the lunar south pole in August 2023. How did each mission go?",
+      "report": "Chandrayaan-3, India's third Moon mission, successfully landed near the lunar south pole on 23 August 2023, marking India's first soft landing in that region. This achievement was highlighted by Prime Minister Narendra Modi declaring 23 August as National Space Day in India. In contrast, Luna 25, a Russian mission, failed to land successfully. It was the first Russian lunar mission in over three decades and was intended to be the first spacecraft to land near the lunar south pole. Despite carrying scientific instruments, including those for analyzing lunar regolith and measuring plasma in the exosphere, Luna 25 did not achieve its primary objective of landing near the south pole.",
+      "source_ids": [
+        "isro#14",
+        "chandrayaan-3#1",
+        "isro#44",
+        "luna-25#0",
+        "chandrayaan-3#49"
+      ],
+      "expected_titles": [
+        "Luna 25",
+        "Chandrayaan-3"
+      ],
+      "titles_found": [
+        "Luna 25",
+        "Chandrayaan-3"
+      ],
+      "facts_retrieved": [
+        false,
+        true,
+        false,
+        true,
+        true
+      ],
+      "facts_stated": [
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "fact_reasons": [
+        "The report states Luna 25 launched on 10 August 2023 on a Soyuz-2 rocket.",
+        "The report states Luna 25 was Russia's first lunar mission since Luna 24 in 1976.",
+        "The report states Luna 25 crashed into the Moon after a failed manoeuvre.",
+        "The report states Chandrayaan-3 touched down near the lunar south pole on 23 August 2023.",
+        "The report states Chandrayaan-3 was the first soft landing near the lunar south pole."
+      ],
+      "fact_judge_error": false,
+      "sentences": 5,
+      "sentences_cited": 0,
+      "invalid_markers": [],
+      "claims_judged": 0,
+      "claims_supported": 0,
+      "support_judge_errors": 0,
+      "unsupported": [],
+      "latency_ms": 31965.795600030106,
+      "cost_usd": 0.0,
+      "llm_calls": 1,
+      "error": null
+    },
+    {
+      "id": "dr-002",
+      "question": "How do the Hubble Space Telescope and the James Webb Space Telescope differ in launch, orbit, mirror size and the light they observe?",
+      "report": "The Hubble Space Telescope and the James Webb Space Telescope differ significantly in their launch, orbit, mirror size, and the light they observe. Hubble was launched in 1990 and orbits Earth, allowing it to capture high-resolution images with minimal atmospheric distortion. In contrast, Webb was launched in 2021 and is in a sun-synchronous orbit, which helps it maintain a consistent viewing angle relative to the Sun. Hubble's primary mirror is 2.4 meters in diameter, while Webb's is 6.5 meters, making it significantly larger. Hubble observes in the near ultraviolet, visible, and near-infrared spectrum, whereas Webb focuses on the mid-infrared range, from 0.6 to 28.5 micrometers. This difference in wavelength means Webb can observe longer wavelengths, which require a larger mirror to achieve the same resolution.",
+      "source_ids": [
+        "james-webb-space-telescope#1",
+        "james-webb-space-telescope#4",
+        "james-webb-space-telescope#82",
+        "hubble-space-telescope#1",
+        "james-webb-space-telescope#6"
+      ],
+      "expected_titles": [
+        "Hubble Space Telescope",
+        "James Webb Space Telescope"
+      ],
+      "titles_found": [
+        "Hubble Space Telescope",
+        "James Webb Space Telescope"
+      ],
+      "facts_retrieved": [
+        false,
+        false,
+        false,
+        false,
+        true,
+        true
+      ],
+      "facts_stated": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "fact_reasons": [
+        "The report states the launch date and the spacecraft name.",
+        "The report states the orbit altitude and the spacecraft name.",
+        "The report states the launch date and the spacecraft name.",
+        "The report states the orbit location and the spacecraft name.",
+        "The report states the mirror sizes and the spacecraft names.",
+        "The report states the observation wavelengths and the spacecraft names."
+      ],
+      "fact_judge_error": false,
+      "sentences": 6,
+      "sentences_cited": 0,
+      "invalid_markers": [],
+      "claims_judged": 0,
+      "claims_supported": 0,
+      "support_judge_errors": 0,
+      "unsupported": [],
+      "latency_ms": 80305.70409999928,
+      "cost_usd": 0.0,
+      "llm_calls": 1,
+      "error": null
+    },
+    {
+      "id": "dr-003",
+      "question": "Trace India's Chandrayaan lunar programme from Chandrayaan-1 to Chandrayaan-3: when was each mission launched and what did it achieve?",
+      "report": "Chandrayaan-1 was launched on 22 October 2008 and achieved its primary goal of mapping the lunar surface, including the distribution of elements like water ice. Chandrayaan-2, launched in 2018, faced a crash landing due to a technical glitch, but it contributed to understanding the lunar environment. Chandrayaan-3, launched in 2023, successfully landed near the lunar south pole, marking India's first soft landing on the Moon and making India the fourth nation to achieve this feat.",
+      "source_ids": [
+        "chandrayaan-1#0",
+        "chandrayaan-2#40",
+        "lvm3#2",
+        "chandrayaan-3#0",
+        "isro#14"
+      ],
+      "expected_titles": [
+        "Chandrayaan-1",
+        "Chandrayaan-2",
+        "Chandrayaan-3"
+      ],
+      "titles_found": [
+        "Chandrayaan-1",
+        "Chandrayaan-2",
+        "Chandrayaan-3"
+      ],
+      "facts_retrieved": [
+        true,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "facts_stated": [
+        true,
+        false,
+        true,
+        true,
+        false,
+        true
+      ],
+      "fact_reasons": [
+        "The report states the exact date and rocket used for Chandrayaan-1's launch.",
+        "The report mentions Chandrayaan-1 finding water molecules, but does not specify the exact mission.",
+        "The report states the exact date and rocket used for Chandrayaan-2's launch.",
+        "The report states the exact date and reason for Chandrayaan-2's crash.",
+        "The report mentions the Chandrayaan-2 orbiter continuing to work after the landing, but does not specify the exact mission.",
+        "The report states the exact date and location of Chandrayaan-3's landing."
+      ],
+      "fact_judge_error": false,
+      "sentences": 3,
+      "sentences_cited": 0,
+      "invalid_markers": [],
+      "claims_judged": 0,
+      "claims_supported": 0,
+      "support_judge_errors": 0,
+      "unsupported": [],
+      "latency_ms": 67618.78730001627,
+      "cost_usd": 0.0,
+      "llm_calls": 1,
+      "error": null
+    }
+  ],
+  "judge_cost_usd": 0.0
+}

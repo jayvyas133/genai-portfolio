@@ -7,9 +7,15 @@ requires-python = ">=3.12"
 dependencies = [
     "aicore",
     "fastapi>=0.115",
+    "httpx>=0.28.1",
     "langgraph>=0.2",
+    "pydantic>=2.8",
+    "pydantic-settings>=2.4",
     "uvicorn[standard]>=0.30",
 ]
+
+[project.scripts]
+deep-research = "deep_research.cli:main"
 
 [tool.uv.sources]
 aicore = { workspace = true }

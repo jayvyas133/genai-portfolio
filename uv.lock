@@ -208,7 +208,10 @@ source = { editable = "projects/02-deep-research" }
 dependencies = [
     { name = "aicore" },
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "langgraph" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -216,7 +219,10 @@ dependencies = [
 requires-dist = [
     { name = "aicore", editable = "packages/aicore" },
     { name = "fastapi", specifier = ">=0.115" },
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "langgraph", specifier = ">=0.2" },
+    { name = "pydantic", specifier = ">=2.8" },
+    { name = "pydantic-settings", specifier = ">=2.4" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.30" },
 ]
 

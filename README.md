@@ -8,7 +8,7 @@ to a conversational agent.
 |---|---------|-------|---------|
 | 0 | [aicore](packages/aicore/) | Python | Shared platform layer: LLM (Large Language Model) clients, retries, tracing, cost, caching, guardrails, evals |
 | 1 | [DocuMind](projects/01-documind/) | Flask, Postgres + pgvector | RAG (Retrieval-Augmented Generation) over documents: hybrid retrieval and reranking, cited answers, refusals, guardrails, HTTP (HyperText Transfer Protocol) API (Application Programming Interface) in Docker |
-| 2 | [Deep Research](projects/02-deep-research/) | FastAPI + LangGraph | Multi-agent system: planner, parallel researchers, writer and critic produce a cited report |
+| 2 | [Deep Research](projects/02-deep-research/) | FastAPI + LangGraph | Multi-agent system: planner, parallel researchers, writer and critic produce a cited report (M1: evals, BM25 search, baseline) |
 | 3 | [Text-to-SQL Agent](projects/03-text-to-sql-agent/) | Flask + LangGraph | Conversational chatbot over a SQL (Structured Query Language) database: multi-turn memory, read-only queries, self-correction |
 
 ## Quickstart
