@@ -14,6 +14,8 @@ different component:
 """
 
 import time
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from datetime import date, datetime
 from datetime import time as dt_time
 from decimal import Decimal
@@ -21,6 +23,7 @@ from typing import Any, Protocol
 
 import psycopg
 from psycopg import sql
+from psycopg_pool import AsyncConnectionPool
 from pydantic import BaseModel, ConfigDict, Field
 
 from text_to_sql_agent.guard import check_sql
@@ -84,15 +87,35 @@ def to_value(cell: Any) -> Value:
 class SqlExecutor:
     """Runs guarded, read-only queries against one database.
 
-    A new connection per query keeps this simple and safe for the CLI and
-    the eval. The HTTP API (M3) will share a connection pool instead.
+    Without a pool it opens a connection per query, which suits the CLI
+    and the eval. The HTTP API passes a pool, so requests reuse
+    connections instead of paying a connect for every query.
     """
 
-    def __init__(self, database_url: str, statement_timeout_ms: int, max_rows: int) -> None:
-        """Connect with ``database_url`` (the read-only role) for each query."""
+    def __init__(
+        self,
+        database_url: str,
+        statement_timeout_ms: int,
+        max_rows: int,
+        pool: AsyncConnectionPool | None = None,
+    ) -> None:
+        """Run queries as the role in ``database_url``, through ``pool`` if given.
+
+        A pool must connect with the same read-only role.
+        """
         self._url = database_url
         self._timeout_ms = statement_timeout_ms
         self._max_rows = max_rows
+        self._pool = pool
+
+    @asynccontextmanager
+    async def _connection(self) -> AsyncIterator[psycopg.AsyncConnection[Any]]:
+        if self._pool is not None:
+            async with self._pool.connection() as conn:
+                yield conn
+        else:
+            async with await psycopg.AsyncConnection.connect(self._url) as conn:
+                yield conn
 
     async def run(self, text: str) -> QueryResult:
         """Check ``text`` with the guard, run it read-only and return its rows.
@@ -115,7 +138,7 @@ class SqlExecutor:
                 that is an outage, not a problem with the query.
         """
         start = time.perf_counter()
-        async with await psycopg.AsyncConnection.connect(self._url) as conn:
+        async with self._connection() as conn:
             # Explicit, so these limits hold even if the role's defaults
             # were never set (layer 3 does not trust layer 1).
             await conn.set_read_only(True)

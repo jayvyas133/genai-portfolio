@@ -1,6 +1,6 @@
 # Text-to-SQL Agent
 
-**Stack:** Flask + LangGraph + PostgreSQL · **Status:** M2 of 3 done (conversational agent with memory and self-correction)
+**Stack:** Flask + LangGraph + PostgreSQL · **Status:** M3 of 3 done (chat API, durable memory, Docker)
 
 A conversational chatbot over a SQL (Structured Query Language)
 database: it answers questions in plain English, remembers the
@@ -16,8 +16,9 @@ Text-to-SQL system therefore needs memory, and since it runs SQL that a
 model wrote, it must be impossible for that SQL to change data, lock
 rows or run forever. M1 built the measuring stick (golden
 conversations, an execution-based eval and a baseline) and the safe
-execution path; M2 adds the agent: memory, self-correction and an
-answer in words.
+execution path; M2 added the agent (memory, self-correction and an
+answer in words); M3 serves it as a chat API whose conversations live
+in Postgres.
 
 ## Milestones
 
@@ -25,9 +26,47 @@ answer in words.
 |---|---|---|
 | M1 | Chinook database, read-only role, SQL guard, executor, golden conversations, execution-accuracy eval, single-shot baseline | done |
 | M2 | LangGraph agent: conversation memory (checkpointer by thread id), write SQL, guard, execute, self-correct, answer | done |
-| M3 | Flask chat API, Postgres checkpointer, connection pool, Docker one-command run | next |
+| M3 | Flask chat API, Postgres checkpointer, connection pools, per-conversation lock, Docker one-command run | done |
 
 ## Architecture
+
+### Chat API
+
+```mermaid
+flowchart LR
+    C[Client] -->|"POST /conversations/{id}/messages"| F["Flask view<br/>(gunicorn: 2 workers x 4 threads)"]
+    F -->|"run_coroutine_threadsafe<br/>+ timeout"| L["Event-loop thread<br/>(one per worker)"]
+    L --> K{"advisory lock<br/>for this conversation"}
+    K -->|held elsewhere| B[409 busy]
+    K --> AG[Agent graph]
+    AG <-->|"checkpoints<br/>role sql_agent_app"| M[("text_to_sql_memory<br/>checkpoints + conversation")]
+    AG -->|"guarded SQL<br/>role sql_agent_ro"| D[("chinook")]
+    AG -->|1-4 calls| LLM[LLM via aicore]
+```
+
+- **Two databases, two roles, two pools.** The agent's SQL runs only as
+  `sql_agent_ro` on `chinook`. Conversation memory (LangGraph's
+  `AsyncPostgresSaver`) lives in `text_to_sql_memory`, owned by
+  `sql_agent_app`, which cannot connect to `chinook`. The admin URL is
+  only given to the one-shot init job.
+- **Sync Flask, async everything else.** Each worker process runs one
+  event-loop thread that owns the pools, the model client and the graph;
+  views submit coroutines to it. Pools are shared by all requests,
+  instead of a connection per request (ADR 0020).
+- **One turn at a time per conversation**, across all workers: a
+  Postgres advisory lock; a second message while one runs gets 409.
+- Conversations survive restarts and can be continued by any worker.
+
+| Endpoint | Returns |
+|---|---|
+| `POST /conversations` | 201 `{"id": "<uuid>"}` |
+| `POST /conversations/{id}/messages` `{"question": "..."}` | 200 `answer`, `sql`, `columns`, `rows`, `truncated`, `attempts`, `error_kind`, `error`, `latency_ms` |
+| `GET /conversations/{id}` | 200 remembered turns (question, SQL, row preview) |
+| `GET /healthz` | 200 `{"chinook": true, "memory": true}`, or 503 |
+
+Errors: 400 invalid body, 404 unknown conversation, 409 turn already
+running, 413 body over 16 KB, 502 model failure, 503 database down,
+504 turn over 120 s.
 
 ### Agent graph (one run per chat turn)
 
@@ -55,8 +94,8 @@ flowchart LR
   (`TEXT_TO_SQL_MAX_ATTEMPTS`, `TEXT_TO_SQL_HISTORY_TURNS`). An empty
   result or a turn out of attempts gets a reply written in code, with no
   call.
-- **M2 memory is in-process** (`InMemorySaver`); the M3 API switches to
-  the Postgres checkpointer (ADR 0019).
+- The CLI and eval use the in-process `InMemorySaver`; the API uses the
+  Postgres checkpointer (ADR 0019, 0020).
 
 ### Safe execution
 
@@ -99,10 +138,31 @@ flowchart LR
 
 ## How to run
 
+**One command (Docker):** starts Postgres, runs the init job (Chinook,
+read-only role, memory database) and serves the API on port 8002. The
+model comes from `AICORE_*` in `.env`.
+
+```bash
+docker compose -f infra/docker-compose.yml up text-to-sql-api
+
+# Local Ollama instead of .env's provider:
+docker compose -f infra/docker-compose.yml run --rm --service-ports   -e AICORE_PROVIDER=ollama -e AICORE_MODEL=qwen2.5:3b -e AICORE_TIMEOUT_S=600   text-to-sql-api
+```
+
+```bash
+ID=$(curl -s -X POST localhost:8002/conversations | jq -r .id)
+curl -s localhost:8002/conversations/$ID/messages -H 'Content-Type: application/json'   -d '{"question": "What is the total revenue for each billing country?"}' | jq .answer
+curl -s localhost:8002/conversations/$ID/messages -H 'Content-Type: application/json'   -d '{"question": "Only for 2024."}' | jq .sql
+curl -s localhost:8002/conversations/$ID | jq '.turns[].question'
+```
+
+**Without Docker (CLI, eval):**
+
 ```bash
 uv sync --all-packages
 docker compose -f infra/docker-compose.yml up -d postgres
 uv run text-to-sql load-db            # chinook database + read-only role (idempotent)
+uv run text-to-sql init-memory        # memory database + role + checkpoint tables (for the API)
 uv run text-to-sql check-golden       # every gold query runs and returns rows
 uv run text-to-sql schema             # the schema exactly as the model sees it
 
@@ -126,6 +186,25 @@ price"). A follow-up's gold SQL is the full query it means. Gold queries
 avoid ties at a `LIMIT`, so every answer is unambiguous.
 
 ## Eval results
+
+### M3: the API, measured
+
+A 3-turn conversation over HTTP in Docker (gunicorn, local
+`qwen2.5:3b` on CPU via the host's Ollama):
+
+| Turn | Result | Latency |
+|---|---|---|
+| "What is the total revenue for each billing country?" | 24 rows, correct | 53.7 s |
+| "Only for 2024." | same query + 2024 filter, correct rows | 51.2 s |
+| "Now just the top 3 countries, highest first." | USA 127.98, Brazil 53.46, Canada 42.57 (= gold) | 39.7 s |
+| A message sent while turn 2 ran | 409 busy | immediate |
+| `GET` the conversation after `docker restart` | all 3 turns remembered | - |
+
+The very first request after Ollama loaded the model took over 120 s
+and got a 504; the timeout cancelled the turn and released its lock, so
+the next message went through. A hosted model answers in seconds. The
+turn-2 answer text skipped Brazil (unsorted rows, 3B model) while its
+rows were right: answers are not graded yet.
 
 ### M2: agent vs baseline, held-out test split
 
@@ -210,8 +289,6 @@ The test split was held back for the M2 comparison above.
   warehouse with hundreds of tables needs schema selection first.
 - **Relaxed matching** (extra columns allowed) can rarely pass a wrong
   answer such as `SELECT *`; the saved SQL makes that auditable.
-- **A connection per query** is fine for the CLI and eval; the M3 API
-  will use a pool.
 - **3B local model.** Numbers show the shape, not final quality; rerun
   with a stronger model once the Cloudflare quota allows.
 - **Column values are not in the prompt** (see c08 above): adding a few
@@ -220,6 +297,6 @@ The test split was held back for the M2 comparison above.
 - **Repair only catches failures.** A query that runs and returns the
   wrong rows is not detected; that needs a checker call per turn.
 - **Answers are not graded yet**: the eval scores rows, not the prose.
-- Next (M3): Flask chat API, Postgres checkpointer so conversations
-  survive restarts and are shared across workers, connection pool,
-  Docker one-command run.
+- **API not built yet:** authentication and per-user conversations,
+  rate limiting, deleting conversations, trimming old checkpoints (the
+  saver keeps every checkpoint), streaming the answer.

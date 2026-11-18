@@ -1,6 +1,7 @@
-"""Create the Chinook sample database and the agent's read-only role.
+"""Create the databases and roles: Chinook with a read-only role, and conversation memory.
 
-This is an admin task, run once with ``text-to-sql load-db``. It connects
+These are admin tasks, run once per deployment with ``text-to-sql
+load-db`` and ``text-to-sql init-memory``. They connect
 as the owner (``admin_database_url``), never as the agent. The role it
 creates is the real security boundary of the system: whatever SQL the
 model writes, Postgres itself refuses to let that role change anything.
@@ -8,14 +9,21 @@ model writes, Postgres itself refuses to let that role change anything.
 ``infra/postgres/init.sql`` is not used because Postgres only runs it on
 the container's very first start, and the portfolio's volume already
 exists.
+
+Conversation memory lives in a separate database owned by a separate
+role (``init_memory``). The agent's SQL only ever runs as the read-only
+role on Chinook, so no credentials it can reach can write anything, not
+even the chat history.
 """
 
 import logging
 from pathlib import Path
 
 import psycopg
+from langgraph.checkpoint.postgres import PostgresSaver
 from psycopg import sql
 from psycopg.conninfo import conninfo_to_dict, make_conninfo
+from psycopg.rows import dict_row
 
 logger = logging.getLogger(__name__)
 
@@ -68,13 +76,7 @@ def load_chinook(
             user, password or database.
         psycopg.Error: If Postgres rejects a statement.
     """
-    ro = conninfo_to_dict(readonly_url)
-    admin = conninfo_to_dict(admin_url)
-    role, password, dbname = (str(ro.get(key) or "") for key in ("user", "password", "dbname"))
-    if not (role and password and dbname):
-        raise LoadError("TEXT_TO_SQL_DATABASE_URL needs a user, a password and a database")
-    if role == admin.get("user"):
-        raise LoadError("the read-only user must not be the admin user")
+    role, password, dbname = _credentials(readonly_url, admin_url, "TEXT_TO_SQL_DATABASE_URL")
 
     loaded = False
     with psycopg.connect(admin_url, autocommit=True) as conn:
@@ -85,7 +87,8 @@ def load_chinook(
         if not exists:
             conn.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(dbname)))
             loaded = True
-        _ensure_role(conn, role, password, statement_timeout_ms)
+        _ensure_login_role(conn, role, password)
+        _make_read_only(conn, role, statement_timeout_ms)
 
     db_url = make_conninfo(admin_url, dbname=dbname)
     if loaded:
@@ -104,8 +107,62 @@ def load_chinook(
     return loaded
 
 
-def _ensure_role(conn: psycopg.Connection, role: str, password: str, timeout_ms: int) -> None:
-    """Create or update the login role with read-only defaults."""
+def init_memory(admin_url: str, memory_url: str) -> None:
+    """Create the memory database, its owner role, and the checkpointer's tables.
+
+    Idempotent, like ``load_chinook``: the role's password is re-applied
+    and the checkpointer's migrations only run the steps not yet applied.
+    The role owns its database and nothing else; it cannot even connect to
+    Chinook, whose CONNECT right is revoked from PUBLIC.
+
+    Raises:
+        LoadError: If the memory URL names the admin user or lacks a user,
+            password or database.
+        psycopg.Error: If Postgres rejects a statement.
+    """
+    role, password, dbname = _credentials(memory_url, admin_url, "TEXT_TO_SQL_MEMORY_DATABASE_URL")
+    with psycopg.connect(admin_url, autocommit=True) as conn:
+        _ensure_login_role(conn, role, password)
+        exists = conn.execute("SELECT 1 FROM pg_database WHERE datname = %s", (dbname,)).fetchone()
+        db, name = sql.Identifier(dbname), sql.Identifier(role)
+        if not exists:
+            conn.execute(sql.SQL("CREATE DATABASE {} OWNER {}").format(db, name))
+        conn.execute(sql.SQL("REVOKE ALL ON DATABASE {} FROM PUBLIC").format(db))
+    with psycopg.connect(memory_url, autocommit=True, row_factory=dict_row) as conn:
+        # LangGraph's own migrations: checkpoint tables, versioned and idempotent.
+        PostgresSaver(conn).setup()
+        conn.execute(_CONVERSATIONS)
+    logger.info("memory database %s ready", dbname)
+
+
+# Conversations the API has created. The checkpointer only knows threads
+# that have had a turn; this table also lets the API tell a new, empty
+# conversation (200) from an id it never issued (404).
+_CONVERSATIONS = b"""
+CREATE TABLE IF NOT EXISTS conversation (
+    id uuid PRIMARY KEY,
+    created_at timestamptz NOT NULL DEFAULT now()
+)
+"""
+
+
+def _credentials(url: str, admin_url: str, setting: str) -> tuple[str, str, str]:
+    """The user, password and database in ``url``, checked before anything is created.
+
+    Raises:
+        LoadError: If one is missing or the user is the admin user.
+    """
+    parts = conninfo_to_dict(url)
+    role, password, dbname = (str(parts.get(key) or "") for key in ("user", "password", "dbname"))
+    if not (role and password and dbname):
+        raise LoadError(f"{setting} needs a user, a password and a database")
+    if role == conninfo_to_dict(admin_url).get("user"):
+        raise LoadError(f"the user in {setting} must not be the admin user")
+    return role, password, dbname
+
+
+def _ensure_login_role(conn: psycopg.Connection, role: str, password: str) -> None:
+    """Create or update an unprivileged login role."""
     exists = conn.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", (role,)).fetchone()
     verb = sql.SQL("ALTER" if exists else "CREATE")
     name = sql.Identifier(role)
@@ -116,6 +173,11 @@ def _ensure_role(conn: psycopg.Connection, role: str, password: str, timeout_ms:
             verb, name, sql.Literal(password)
         )
     )
+
+
+def _make_read_only(conn: psycopg.Connection, role: str, timeout_ms: int) -> None:
+    """Give ``role`` read-only and timeout defaults for every session."""
+    name = sql.Identifier(role)
     # Every session of this role starts read-only and with a timeout.
     conn.execute(sql.SQL("ALTER ROLE {} SET default_transaction_read_only = on").format(name))
     conn.execute(

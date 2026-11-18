@@ -215,6 +215,12 @@ class ConversationalAgent:
             attempts=state.get("attempts", 0),
         )
 
+    async def history(self, thread_id: str) -> list[PastTurn]:
+        """The turns remembered for ``thread_id`` (the last ``history_turns``), oldest first."""
+        snapshot = await self.graph.aget_state({"configurable": {"thread_id": thread_id}})
+        history: list[PastTurn] = snapshot.values.get("history", [])
+        return history
+
     def _build(self, checkpointer: BaseCheckpointSaver[Any]) -> CompiledStateGraph:  # type: ignore[type-arg]
         graph = StateGraph(TurnState)
         graph.add_node("write_sql", self._write_sql)

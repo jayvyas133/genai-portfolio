@@ -101,6 +101,44 @@ services:
     # A crashed worker is restarted; its unfinished job is reclaimed from Redis.
     restart: unless-stopped
 
+  # Text-to-SQL chat API (projects/03-text-to-sql-agent).
+  # `docker compose up text-to-sql-api` runs the one-shot init job first
+  # (Chinook + read-only role, memory database + checkpoint tables), then
+  # the API. Each database URL uses its own role.
+  text-to-sql-init:
+    build:
+      context: ..
+      dockerfile: projects/03-text-to-sql-agent/Dockerfile
+    image: ai-portfolio/text-to-sql
+    command: ["sh", "-c", "text-to-sql load-db && text-to-sql init-memory"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      TEXT_TO_SQL_ADMIN_DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/postgres
+      TEXT_TO_SQL_DATABASE_URL: postgresql://sql_agent_ro:${TEXT_TO_SQL_RO_PASSWORD:-sql_agent_ro}@postgres:5432/chinook
+      TEXT_TO_SQL_MEMORY_DATABASE_URL: postgresql://sql_agent_app:${TEXT_TO_SQL_APP_PASSWORD:-sql_agent_app}@postgres:5432/text_to_sql_memory
+
+  text-to-sql-api:
+    image: ai-portfolio/text-to-sql
+    depends_on:
+      text-to-sql-init:
+        condition: service_completed_successfully
+    env_file:
+      - path: ../.env
+        required: false
+    environment:
+      # Only the two agent roles; the admin URL stays in the init job.
+      TEXT_TO_SQL_DATABASE_URL: postgresql://sql_agent_ro:${TEXT_TO_SQL_RO_PASSWORD:-sql_agent_ro}@postgres:5432/chinook
+      TEXT_TO_SQL_MEMORY_DATABASE_URL: postgresql://sql_agent_app:${TEXT_TO_SQL_APP_PASSWORD:-sql_agent_app}@postgres:5432/text_to_sql_memory
+      # Ollama runs on the host, not in the compose network.
+      AICORE_OLLAMA_BASE_URL: http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8002:8000"
+    restart: unless-stopped
+
 volumes:
   pgdata:
   redisdata:

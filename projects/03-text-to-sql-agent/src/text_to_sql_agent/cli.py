@@ -24,7 +24,7 @@ from text_to_sql_agent import aio
 from text_to_sql_agent.agent import AGENT_PROMPT_VERSION, ConversationalAgent
 from text_to_sql_agent.baseline import SingleShotAgent
 from text_to_sql_agent.config import TextToSqlSettings
-from text_to_sql_agent.database import LoadError, load_chinook
+from text_to_sql_agent.database import LoadError, init_memory, load_chinook
 from text_to_sql_agent.evaluate import EvalRun, evaluate, format_run
 from text_to_sql_agent.executor import QueryResult, QueryRunner, SqlExecutor
 from text_to_sql_agent.generation import SQL_PROMPT_VERSION
@@ -78,6 +78,12 @@ def run_load_db(settings: TextToSqlSettings, reset: bool) -> None:
         reset=reset,
     )
     print("Loaded Chinook." if loaded else "Chinook already loaded; role and grants refreshed.")
+
+
+def run_init_memory(settings: TextToSqlSettings) -> None:
+    """Create the conversation-memory database, its role and tables."""
+    init_memory(settings.admin_database_url, settings.memory_database_url)
+    print("Memory database ready.")
 
 
 async def run_schema(settings: TextToSqlSettings) -> None:
@@ -197,6 +203,7 @@ def build_parser() -> argparse.ArgumentParser:
     load = sub.add_parser("load-db", help="create the Chinook database and the read-only role")
     load.add_argument("--reset", action="store_true", help="drop and reload the database")
 
+    sub.add_parser("init-memory", help="create the conversation-memory database for the API")
     sub.add_parser("schema", help="print the schema the model sees")
     sub.add_parser("check-golden", help="run every gold query against the database")
 
@@ -222,6 +229,8 @@ def main(argv: Sequence[str] | None = None) -> None:
         match args.command:
             case "load-db":
                 run_load_db(settings, args.reset)
+            case "init-memory":
+                run_init_memory(settings)
             case "schema":
                 aio.run(run_schema(settings))
             case "check-golden":
