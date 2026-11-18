@@ -113,7 +113,7 @@ per-match Python callback that runs the Luhn check, not backtracking.
   Paraphrases, other languages (including Hindi and other Indic
   languages), encodings such as base64, and indirect injection worded
   differently all get through. Real protection is architectural: least
-  privilege (for example a read-only database user in project 02), and
+  privilege (for example a read-only database user in the Text-to-SQL project), and
   validating what the model's output is allowed to trigger.
 - **Regex PII detection misses formats and names.** It misses
   `(415) 555-0123`, names, addresses and Aadhaar numbers, and it flags a

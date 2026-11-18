@@ -2,7 +2,7 @@
 
 - **Status:** proposed | accepted | superseded by ADR-XXXX
 - **Date:** YYYY-MM-DD
-- **Scope:** aicore | 01-documind | 02-text-to-sql-agent | 03-sql-slm-finetune | 04-deep-research | 05-indic-voice-agent
+- **Scope:** aicore | 01-documind | 02-deep-research | 03-text-to-sql-agent | portfolio
 
 ## Context
 What problem or force requires a decision?

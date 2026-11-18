@@ -1,7 +1,7 @@
 [project]
 name = "genai-portfolio"
 version = "0.1.0"
-description = "Portfolio of 5 production-style AI projects sharing a common platform layer (aicore)."
+description = "Portfolio of 3 production-style AI projects sharing a common platform layer (aicore)."
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = []

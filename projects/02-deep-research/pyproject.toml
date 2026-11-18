@@ -1,12 +1,13 @@
 [project]
 name = "deep-research"
 version = "0.1.0"
-description = "Deep research agent service (FastAPI)."
+description = "Multi-agent deep research service (FastAPI + LangGraph)."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "aicore",
     "fastapi>=0.115",
+    "langgraph>=0.2",
     "uvicorn[standard]>=0.30",
 ]
 

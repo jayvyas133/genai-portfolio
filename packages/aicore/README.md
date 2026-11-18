@@ -1,6 +1,6 @@
 # aicore
 
-Shared platform layer used by all five portfolio projects. Every LLM
+Shared platform layer used by all three portfolio projects. Every LLM
 (Large Language Model), embedding and reranker call in the portfolio
 goes through `aicore`, so
 reliability, tracing, cost tracking and caching are built once and behave
