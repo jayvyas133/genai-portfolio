@@ -118,7 +118,7 @@ async def test_report_splits_first_turns_from_follow_ups_and_saves_json(tmp_path
     run = EvalRun(
         agent="scripted",
         model="m",
-        sql_prompt_version="v1",
+        prompt_version="v1",
         split="dev",
         created_at=datetime.now(UTC),
         cases=cases,

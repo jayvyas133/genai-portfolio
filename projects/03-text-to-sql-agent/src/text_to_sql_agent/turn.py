@@ -27,6 +27,10 @@ class AgentTurn(BaseModel):
     result: QueryResult | None = None
     error_kind: ErrorKind | None = None
     error: str | None = None
+    # The reply a chat user reads; None for agents that only return rows.
+    answer: str | None = None
+    # SQL-writing calls made; more than 1 means the agent repaired its query.
+    attempts: int = 1
 
 
 class Agent(Protocol):

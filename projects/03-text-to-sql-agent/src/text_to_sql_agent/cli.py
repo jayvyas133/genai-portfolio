@@ -6,32 +6,50 @@ for the models).
 """
 
 import argparse
+import asyncio
 import logging
 import time
+import uuid
 from collections.abc import Sequence
 from datetime import UTC, datetime
 
 import psycopg
+from aicore.client import LLMClient
 from aicore.config import LLMSettings
 from aicore.errors import LLMError
 from aicore.providers.factory import build_client
 from aicore.tracing import InMemoryTracer
 
 from text_to_sql_agent import aio
+from text_to_sql_agent.agent import AGENT_PROMPT_VERSION, ConversationalAgent
 from text_to_sql_agent.baseline import SingleShotAgent
 from text_to_sql_agent.config import TextToSqlSettings
 from text_to_sql_agent.database import LoadError, load_chinook
 from text_to_sql_agent.evaluate import EvalRun, evaluate, format_run
-from text_to_sql_agent.executor import QueryResult, SqlExecutor
+from text_to_sql_agent.executor import QueryResult, QueryRunner, SqlExecutor
 from text_to_sql_agent.generation import SQL_PROMPT_VERSION
 from text_to_sql_agent.golden import Split, load_golden, run_gold
-from text_to_sql_agent.schema import load_schema
+from text_to_sql_agent.schema import Schema, load_schema
+from text_to_sql_agent.turn import AgentTurn
 
-AGENTS = ["single-shot"]
+AGENTS = ["agent", "single-shot"]
 
 
 def _executor(settings: TextToSqlSettings) -> SqlExecutor:
     return SqlExecutor(settings.database_url, settings.statement_timeout_ms, settings.max_rows)
+
+
+def build_agent(
+    name: str,
+    client: LLMClient,
+    runner: QueryRunner,
+    schema: Schema,
+    settings: TextToSqlSettings,
+) -> ConversationalAgent | SingleShotAgent:
+    """The agent called ``name``, wired to ``client``, ``runner`` and ``schema``."""
+    if name == "agent":
+        return ConversationalAgent(client, runner, schema, settings.agent_limits())
+    return SingleShotAgent(client, runner, schema)
 
 
 def format_table(result: QueryResult, limit: int = 20) -> str:
@@ -77,30 +95,74 @@ async def run_check_golden(settings: TextToSqlSettings) -> None:
     print(f"All {turns} gold queries in {len(cases)} conversations run and return rows.")
 
 
-async def run_ask(settings: TextToSqlSettings, llm: LLMSettings, question: str) -> None:
-    """Answer one question with the baseline and print the SQL and rows."""
-    tracer = InMemoryTracer()
-    client = build_client(llm, tracer=tracer)
-    agent = SingleShotAgent(client, _executor(settings), await load_schema(settings.database_url))
-    start = time.perf_counter()
-    try:
-        turn = await agent.ask("cli", question)
-    finally:
-        await client.aclose()
+def print_turn(turn: AgentTurn) -> None:
+    """Show the answer, then the SQL and rows behind it."""
+    if turn.answer:
+        print(turn.answer)
+        print()
     print(turn.sql or "(no SQL)")
+    if turn.attempts > 1:
+        print(f"(after {turn.attempts} attempts)")
     print()
     if turn.result is not None:
         print(format_table(turn.result))
     else:
         print(f"{turn.error_kind}: {turn.error}")
-    cost = sum(r.cost_usd or 0.0 for r in tracer.records)
-    print(f"\n{time.perf_counter() - start:.1f} s, {len(tracer.records)} LLM call(s), ${cost:.5f}")
+
+
+def _usage(tracer: InMemoryTracer, before: int, start: float) -> str:
+    records = tracer.records[before:]
+    cost = sum(r.cost_usd or 0.0 for r in records)
+    return f"{time.perf_counter() - start:.1f} s, {len(records)} LLM call(s), ${cost:.5f}"
+
+
+async def run_ask(settings: TextToSqlSettings, llm: LLMSettings, question: str, name: str) -> None:
+    """Answer one question and print the answer, SQL and rows."""
+    tracer = InMemoryTracer()
+    client = build_client(llm, tracer=tracer)
+    schema = await load_schema(settings.database_url)
+    agent = build_agent(name, client, _executor(settings), schema, settings)
+    start = time.perf_counter()
+    try:
+        turn = await agent.ask("cli", question)
+    finally:
+        await client.aclose()
+    print_turn(turn)
+    print(f"\n{_usage(tracer, 0, start)}")
+
+
+async def run_chat(settings: TextToSqlSettings, llm: LLMSettings) -> None:
+    """An interactive conversation with the agent; an empty line or Ctrl+D ends it."""
+    tracer = InMemoryTracer()
+    client = build_client(llm, tracer=tracer)
+    schema = await load_schema(settings.database_url)
+    agent = build_agent("agent", client, _executor(settings), schema, settings)
+    thread_id = f"chat-{uuid.uuid4().hex[:8]}"
+    print(f"Conversation {thread_id}. Ask about the Chinook music store; empty line to quit.")
+    try:
+        while True:
+            try:
+                # In a thread, so the event loop (and the client's connections) stays alive.
+                question = (await asyncio.to_thread(input, "\n> ")).strip()
+            except EOFError:
+                break
+            if not question:
+                break
+            before, start = len(tracer.records), time.perf_counter()
+            print_turn(await agent.ask(thread_id, question))
+            print(f"\n[{_usage(tracer, before, start)}]")
+    finally:
+        await client.aclose()
 
 
 async def run_eval(
-    settings: TextToSqlSettings, llm: LLMSettings, split: Split | None, limit: int | None
+    settings: TextToSqlSettings,
+    llm: LLMSettings,
+    name: str,
+    split: Split | None,
+    limit: int | None,
 ) -> None:
-    """Evaluate the baseline on the golden ``split``, print the table and save JSON."""
+    """Evaluate agent ``name`` on the golden ``split``, print the table and save JSON."""
     cases = load_golden(settings.evals_dir / "golden.jsonl", split)[:limit]
     executor = _executor(settings)
     gold, problems = await run_gold(cases, executor)
@@ -108,7 +170,8 @@ async def run_eval(
         raise SystemExit("Golden dataset problems:\n" + "\n".join(problems))
     tracer = InMemoryTracer()
     client = build_client(llm, tracer=tracer)
-    agent = SingleShotAgent(client, executor, await load_schema(settings.database_url))
+    schema = await load_schema(settings.database_url)
+    agent = build_agent(name, client, executor, schema, settings)
     try:
         results = await evaluate(cases, agent, gold, tracer)
     finally:
@@ -116,7 +179,7 @@ async def run_eval(
     run = EvalRun(
         agent=agent.name,
         model=llm.model,
-        sql_prompt_version=SQL_PROMPT_VERSION,
+        prompt_version=AGENT_PROMPT_VERSION if name == "agent" else SQL_PROMPT_VERSION,
         split=split,
         created_at=datetime.now(UTC),
         cases=results,
@@ -139,9 +202,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     ask = sub.add_parser("ask", help="answer one question and print the SQL and rows")
     ask.add_argument("question")
+    ask.add_argument("--agent", choices=AGENTS, default="agent")
+
+    sub.add_parser("chat", help="have a conversation with the agent")
 
     ev = sub.add_parser("eval", help="score an agent on the golden conversations")
-    ev.add_argument("--agent", choices=AGENTS, default="single-shot")
+    ev.add_argument("--agent", choices=AGENTS, default="agent")
     ev.add_argument("--split", choices=["dev", "test"], default=None)
     ev.add_argument("--limit", type=int, default=None, help="only the first N conversations")
     return parser
@@ -161,9 +227,11 @@ def main(argv: Sequence[str] | None = None) -> None:
             case "check-golden":
                 aio.run(run_check_golden(settings))
             case "ask":
-                aio.run(run_ask(settings, LLMSettings(), args.question))
+                aio.run(run_ask(settings, LLMSettings(), args.question, args.agent))
+            case "chat":
+                aio.run(run_chat(settings, LLMSettings()))
             case "eval":
-                aio.run(run_eval(settings, LLMSettings(), args.split, args.limit))
+                aio.run(run_eval(settings, LLMSettings(), args.agent, args.split, args.limit))
     except LLMError as err:
         raise SystemExit(f"Model call failed: {type(err).__name__}: {err}") from err
     except LoadError as err:

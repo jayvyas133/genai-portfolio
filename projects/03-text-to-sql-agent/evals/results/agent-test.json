@@ -1,0 +1,349 @@
+{
+  "agent": "agent",
+  "model": "qwen2.5:3b",
+  "prompt_version": "v1",
+  "split": "test",
+  "created_at": "2026-11-18T09:23:32.370727Z",
+  "cases": [
+    {
+      "id": "s13",
+      "turns": [
+        {
+          "question": "List the names of the tracks on the album 'Let There Be Rock'.",
+          "tags": [
+            "join"
+          ],
+          "gold_sql": "SELECT t.name FROM track t JOIN album a ON a.album_id = t.album_id WHERE a.title = 'Let There Be Rock'",
+          "sql": "SELECT t.name \nFROM track t\nJOIN album a ON t.album_id = a.album_id\nWHERE a.title = 'Let There Be Rock'",
+          "correct": true,
+          "rows": 8,
+          "error_kind": null,
+          "error": null,
+          "answer": "The names of the tracks on the album 'Let There Be Rock' are:\n- Let There Be Rock\n- Go Down\n- Dog Eat Dog",
+          "attempts": 1,
+          "latency_ms": 57235.503099975176,
+          "llm_calls": 2,
+          "cost_usd": 0.0
+        }
+      ]
+    },
+    {
+      "id": "c06",
+      "turns": [
+        {
+          "question": "Which 5 genres have the most tracks? Show the genre name and the number of tracks, most first.",
+          "tags": [
+            "join",
+            "order-limit"
+          ],
+          "gold_sql": "SELECT g.name, count(*) AS tracks FROM track t JOIN genre g ON g.genre_id = t.genre_id GROUP BY g.genre_id, g.name ORDER BY tracks DESC LIMIT 5",
+          "sql": "SELECT g.name AS genre_name, COUNT(*) AS track_count\nFROM genre g\nJOIN track t ON g.genre_id = t.genre_id\nGROUP BY g.name\nORDER BY track_count DESC\nLIMIT 5",
+          "correct": true,
+          "rows": 5,
+          "error_kind": null,
+          "error": null,
+          "answer": "Rock has 1297 tracks, Latin has 579 tracks, Metal has 374 tracks, Alternative & Punk has 332 tracks, and Jazz has 130 tracks.",
+          "attempts": 1,
+          "latency_ms": 22878.601300006267,
+          "llm_calls": 2,
+          "cost_usd": 0.0
+        },
+        {
+          "question": "Show the same, but count the tracks sold instead.",
+          "tags": [
+            "follow-up",
+            "reference",
+            "join"
+          ],
+          "gold_sql": "SELECT g.name, sum(il.quantity) AS sold FROM invoice_line il JOIN track t ON t.track_id = il.track_id JOIN genre g ON g.genre_id = t.genre_id GROUP BY g.genre_id, g.name ORDER BY sold DESC LIMIT 5",
+          "sql": "SELECT g.name AS genre_name, COUNT(*) AS track_count\nFROM genre g\nJOIN track t ON g.genre_id = t.genre_id\nJOIN invoice_line il ON t.track_id = il.track_id\nGROUP BY g.name\nORDER BY track_count DESC\nLIMIT 5",
+          "correct": true,
+          "rows": 5,
+          "error_kind": null,
+          "error": null,
+          "answer": "The top 5 genres by tracks sold are: Rock with 835 tracks, Latin with 386 tracks, Metal with 264 tracks, Alternative & Punk with 244 tracks, and Jazz with 80 tracks.",
+          "attempts": 1,
+          "latency_ms": 31499.784199986607,
+          "llm_calls": 2,
+          "cost_usd": 0.0
+        }
+      ]
+    },
+    {
+      "id": "s14",
+      "turns": [
+        {
+          "question": "How many customers does each sales support agent look after? Show the agent's first and last name and the number of customers.",
+          "tags": [
+            "join",
+            "aggregate"
+          ],
+          "gold_sql": "SELECT e.first_name, e.last_name, count(*) AS customers FROM employee e JOIN customer c ON c.support_rep_id = e.employee_id GROUP BY e.employee_id, e.first_name, e.last_name",
+          "sql": "SELECT e.first_name, e.last_name, COUNT(c.customer_id) AS number_of_customers\nFROM employee e\nLEFT JOIN customer c ON e.employee_id = c.support_rep_id\nGROUP BY e.employee_id, e.first_name, e.last_name",
+          "correct": false,
+          "rows": 8,
+          "error_kind": null,
+          "error": null,
+          "answer": "Margaret Park looks after 20 customers.\nMichael Mitchell and Nancy Edwards do not look after any customers.\nRobert King looks after 0 customers.\nJane Peacock manages 21 customers.\nAndrew Adams does not look after any customers.\nSteve Johnson takes care of 18 customers.\nLaura Callahan does not look after any customers.",
+          "attempts": 1,
+          "latency_ms": 31375.341600039974,
+          "llm_calls": 2,
+          "cost_usd": 0.0
+        }
+      ]
+    },
+    {
+      "id": "c07",
+      "turns": [
+        {
+          "question": "How many invoices were there in 2022?",
+          "tags": [
+            "date"
+          ],
+          "gold_sql": "SELECT count(*) AS invoices FROM invoice WHERE invoice_date >= '2022-01-01' AND invoice_date < '2023-01-01'",
+          "sql": "SELECT COUNT(*) \nFROM invoice \nWHERE invoice_date BETWEEN '2022-01-01 00:00:00'::timestamp AND '2022-12-31 23:59:59'::timestamp;",
+          "correct": true,
+          "rows": 1,
+          "error_kind": null,
+          "error": null,
+          "answer": "There were 83 invoices in 2022 as per the SQL query result.",
+          "attempts": 1,
+          "latency_ms": 20157.83000004012,
+          "llm_calls": 2,
+          "cost_usd": 0.0
+        },
+        {
+          "question": "How much revenue did they bring in?",
+          "tags": [
+            "follow-up",
+            "reference"
+          ],
+          "gold_sql": "SELECT sum(total) AS revenue FROM invoice WHERE invoice_date >= '2022-01-01' AND invoice_date < '2023-01-01'",
+          "sql": "SELECT SUM(total) \nFROM invoice;",
+          "correct": false,
+          "rows": 1,
+          "error_kind": null,
+          "error": null,
+          "answer": "The total revenue brought in is $2328.60.",
+          "attempts": 1,
+          "latency_ms": 8271.326299989596,
+          "llm_calls": 2,
+          "cost_usd": 0.0
+        },
+        {
+          "question": "And in 2023?",
+          "tags": [
+            "follow-up",
+            "ellipsis"
+          ],
+          "gold_sql": "SELECT sum(total) AS revenue FROM invoice WHERE invoice_date >= '2023-01-01' AND invoice_date < '2024-01-01'",
+          "sql": "SELECT SUM(total) \nFROM invoice \nWHERE invoice_date BETWEEN '2023-01-01 00:00:00'::timestamp AND '2023-12-31 23:59:59'::timestamp;",
+          "correct": true,
+          "rows": 1,
+          "error_kind": null,
+          "error": null,
+          "answer": "In 2023, the total sum of invoices is 469.58.",
+          "attempts": 1,
+          "latency_ms": 20677.916199958418,
+          "llm_calls": 2,
+          "cost_usd": 0.0
+        }
+      ]
+    },
+    {
+      "id": "s15",
+      "turns": [
+        {
+          "question": "What was the total revenue in each year? Show the year and the revenue.",
+          "tags": [
+            "date",
+            "aggregate"
+          ],
+          "gold_sql": "SELECT extract(year FROM invoice_date) AS year, sum(total) AS revenue FROM invoice GROUP BY 1",
+          "sql": "SELECT \n    EXTRACT(YEAR FROM invoice_date) AS year,\n    SUM(unit_price * quantity) AS total_revenue\nFROM \n    invoice_line\nJOIN \n    invoice ON invoice_line.invoice_id = invoice.invoice_id\nGROUP BY \n    EXTRACT(YEAR FROM invoice_date)\nORDER BY \n    year;",
+          "correct": true,
+          "rows": 5,
+          "error_kind": null,
+          "error": null,
+          "answer": "The total revenue in each year is as follows: \n2021 had a total revenue of $449.46, \n2022 had a total revenue of $481.45, \n2023 had a total revenue of $469.58, \n2024 had a total revenue of $477.53, \n2025 had a total revenue of $450.58.",
+          "attempts": 1,
+          "latency_ms": 35002.37719999859,
+          "llm_calls": 2,
+          "cost_usd": 0.0
+        }
+      ]
+    },
+    {
+      "id": "c08",
+      "turns": [
+        {
+          "question": "Which employees are sales support agents? Give their first and last names.",
+          "tags": [
+            "filter"
+          ],
+          "gold_sql": "SELECT first_name, last_name FROM employee WHERE title = 'Sales Support Agent'",
+          "sql": "SELECT first_name, last_name\nFROM employee\nWHERE first_name LIKE '%Sales%'\n  AND first_name != 'Sales'\n  AND last_name != 'Sales'\n  AND reports_to IS NULL;",
+          "correct": false,
+          "rows": 0,
+          "error_kind": null,
+          "error": null,
+          "answer": "No rows matched that question.",
+          "attempts": 1,
+          "latency_ms": 10442.585600016173,
+          "llm_calls": 1,
+          "cost_usd": 0.0
+        },
+        {
+          "question": "How much revenue did each of them bring in through their customers? Show the name and the revenue.",
+          "tags": [
+            "follow-up",
+            "reference",
+            "join"
+          ],
+          "gold_sql": "SELECT e.first_name, e.last_name, sum(i.total) AS revenue FROM employee e JOIN customer c ON c.support_rep_id = e.employee_id JOIN invoice i ON i.customer_id = c.customer_id WHERE e.title = 'Sales Support Agent' GROUP BY e.employee_id, e.first_name, e.last_name",
+          "sql": "SELECT e.first_name, e.last_name, SUM(il.quantity * il.unit_price) AS revenue\nFROM employee e\nJOIN customer c ON e.employee_id = c.support_rep_id\nJOIN invoice i ON c.customer_id = i.customer_id\nJOIN invoice_line il ON i.invoice_id = il.invoice_id\nJOIN employee e2 ON e2.employee_id = c.support_rep_id\nWHERE e.first_name LIKE '%Sales%'\n  AND e.first_name != 'Sales'\n  AND e.last_name != 'Sales'\n  AND e2.reports_to IS NULL\nGROUP BY e.first_name, e.last_name;",
+          "correct": false,
+          "rows": 0,
+          "error_kind": null,
+          "error": null,
+          "answer": "No rows matched that question.",
+          "attempts": 1,
+          "latency_ms": 30155.855800025165,
+          "llm_calls": 1,
+          "cost_usd": 0.0
+        },
+        {
+          "question": "Which of them brought in the most?",
+          "tags": [
+            "follow-up",
+            "reference",
+            "order-limit"
+          ],
+          "gold_sql": "SELECT e.first_name, e.last_name FROM employee e JOIN customer c ON c.support_rep_id = e.employee_id JOIN invoice i ON i.customer_id = c.customer_id WHERE e.title = 'Sales Support Agent' GROUP BY e.employee_id, e.first_name, e.last_name ORDER BY sum(i.total) DESC LIMIT 1",
+          "sql": "SELECT e2.first_name, e2.last_name, SUM(il.quantity * il.unit_price) AS revenue\nFROM employee e\nJOIN customer c ON e.employee_id = c.support_rep_id\nJOIN invoice i ON c.customer_id = i.customer_id\nJOIN invoice_line il ON i.invoice_id = il.invoice_id\nJOIN employee e2 ON e2.employee_id = c.support_rep_id\nWHERE e2.first_name LIKE '%Sales%'\n  AND e2.first_name != 'Sales'\n  AND e2.last_name != 'Sales'\n  AND e2.reports_to IS NULL\nGROUP BY e2.first_name, e2.last_name\nORDER BY revenue DESC\nLIMIT 1;",
+          "correct": false,
+          "rows": 0,
+          "error_kind": null,
+          "error": null,
+          "answer": "No rows matched that question.",
+          "attempts": 3,
+          "latency_ms": 89746.44399998942,
+          "llm_calls": 3,
+          "cost_usd": 0.0
+        }
+      ]
+    },
+    {
+      "id": "s16",
+      "turns": [
+        {
+          "question": "How many tracks have never been purchased?",
+          "tags": [
+            "subquery"
+          ],
+          "gold_sql": "SELECT count(*) AS tracks FROM track t WHERE NOT EXISTS (SELECT 1 FROM invoice_line il WHERE il.track_id = t.track_id)",
+          "sql": "SELECT COUNT(track_id) AS num_tracks_not_purchased\nFROM track\nWHERE track_id NOT IN (\n    SELECT track_id\n    FROM invoice_line\n);",
+          "correct": true,
+          "rows": 1,
+          "error_kind": null,
+          "error": null,
+          "answer": "There are 1519 tracks that have never been purchased.",
+          "attempts": 1,
+          "latency_ms": 15094.677500019316,
+          "llm_calls": 2,
+          "cost_usd": 0.0
+        }
+      ]
+    },
+    {
+      "id": "s17",
+      "turns": [
+        {
+          "question": "Which billing country has the highest average invoice total?",
+          "tags": [
+            "aggregate",
+            "order-limit"
+          ],
+          "gold_sql": "SELECT billing_country FROM invoice GROUP BY billing_country ORDER BY avg(total) DESC LIMIT 1",
+          "sql": "SELECT billing_country, AVG(total) as avg_total\nFROM invoice\nGROUP BY billing_country\nORDER BY avg_total DESC\nLIMIT 1;",
+          "correct": true,
+          "rows": 1,
+          "error_kind": null,
+          "error": null,
+          "answer": "The billing country with the highest average invoice total is Chile with an average total of 6.66.",
+          "attempts": 1,
+          "latency_ms": 14232.81869996572,
+          "llm_calls": 2,
+          "cost_usd": 0.0
+        }
+      ]
+    },
+    {
+      "id": "s18",
+      "turns": [
+        {
+          "question": "Which artist has sold the most tracks?",
+          "tags": [
+            "join",
+            "order-limit"
+          ],
+          "gold_sql": "SELECT r.name FROM invoice_line il JOIN track t ON t.track_id = il.track_id JOIN album a ON a.album_id = t.album_id JOIN artist r ON r.artist_id = a.artist_id GROUP BY r.artist_id, r.name ORDER BY sum(il.quantity) DESC LIMIT 1",
+          "sql": "SELECT a.artist_id, a.name, SUM(il.quantity) AS total_tracks_sold\nFROM artist a\nJOIN album al ON a.artist_id = al.artist_id\nJOIN track t ON al.album_id = t.album_id\nJOIN invoice_line il ON t.track_id = il.track_id\nGROUP BY a.artist_id, a.name\nORDER BY total_tracks_sold DESC\nLIMIT 1;",
+          "correct": true,
+          "rows": 1,
+          "error_kind": null,
+          "error": null,
+          "answer": "Iron Maiden has sold 140 tracks, which is the highest number among the given data.",
+          "attempts": 1,
+          "latency_ms": 23834.966900001746,
+          "llm_calls": 2,
+          "cost_usd": 0.0
+        }
+      ]
+    },
+    {
+      "id": "s19",
+      "turns": [
+        {
+          "question": "How many customers have no company listed?",
+          "tags": [
+            "filter"
+          ],
+          "gold_sql": "SELECT count(*) AS customers FROM customer WHERE company IS NULL",
+          "sql": "SELECT COUNT(*) \nFROM customer \nWHERE company IS NULL;",
+          "correct": true,
+          "rows": 1,
+          "error_kind": null,
+          "error": null,
+          "answer": "There are 49 customers who have no company listed.",
+          "attempts": 1,
+          "latency_ms": 7951.680800004397,
+          "llm_calls": 2,
+          "cost_usd": 0.0
+        }
+      ]
+    },
+    {
+      "id": "s20",
+      "turns": [
+        {
+          "question": "What was the total revenue in March 2024?",
+          "tags": [
+            "date"
+          ],
+          "gold_sql": "SELECT sum(total) AS revenue FROM invoice WHERE invoice_date >= '2024-03-01' AND invoice_date < '2024-04-01'",
+          "sql": "SELECT SUM(unit_price * quantity) AS total_revenue\nFROM invoice_line\nJOIN invoice ON invoice_line.invoice_id = invoice.invoice_id\nWHERE invoice_date BETWEEN '2024-03-01' AND '2024-03-31';",
+          "correct": true,
+          "rows": 1,
+          "error_kind": null,
+          "error": null,
+          "answer": "The total revenue in March 2024 was 37.62.",
+          "attempts": 1,
+          "latency_ms": 20192.46089999797,
+          "llm_calls": 2,
+          "cost_usd": 0.0
+        }
+      ]
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 # Text-to-SQL Agent
 
-**Stack:** Flask + LangGraph + PostgreSQL · **Status:** M1 of 3 done (database, safe execution, evals, baseline)
+**Stack:** Flask + LangGraph + PostgreSQL · **Status:** M2 of 3 done (conversational agent with memory and self-correction)
 
 A conversational chatbot over a SQL (Structured Query Language)
 database: it answers questions in plain English, remembers the
@@ -14,19 +14,51 @@ Business users ask questions of data in conversations, not one-offs:
 top 3." The second and third questions mean nothing on their own. A
 Text-to-SQL system therefore needs memory, and since it runs SQL that a
 model wrote, it must be impossible for that SQL to change data, lock
-rows or run forever. M1 builds the measuring stick (golden
+rows or run forever. M1 built the measuring stick (golden
 conversations, an execution-based eval and a baseline) and the safe
-execution path everything else will use.
+execution path; M2 adds the agent: memory, self-correction and an
+answer in words.
 
 ## Milestones
 
 | M | Scope | State |
 |---|---|---|
 | M1 | Chinook database, read-only role, SQL guard, executor, golden conversations, execution-accuracy eval, single-shot baseline | done |
-| M2 | LangGraph agent: conversation memory (checkpointer by thread id), generate, guard, execute, self-correct, answer | next |
-| M3 | Flask chat API with sessions, connection pool, Docker one-command run | |
+| M2 | LangGraph agent: conversation memory (checkpointer by thread id), write SQL, guard, execute, self-correct, answer | done |
+| M3 | Flask chat API, Postgres checkpointer, connection pool, Docker one-command run | next |
 
 ## Architecture
+
+### Agent graph (one run per chat turn)
+
+```mermaid
+flowchart LR
+    S([question + thread_id]) --> W["write_sql<br/>schema + last 3 turns as chat<br/>+ this turn's failed attempts"]
+    W --> X["execute<br/>guard + read-only executor"]
+    X -->|rows| A["answer<br/>1-3 sentences from up to 20 rows"]
+    X -->|"error, attempts < 3<br/>(failed SQL + exact error fed back)"| W
+    X -->|out of attempts| R
+    A --> R["record<br/>append turn to history (window 3)"]
+    R --> E([AgentTurn: answer, SQL, rows, attempts])
+    CP[(checkpointer<br/>keyed by thread_id)] <-.-> R
+```
+
+- **Memory:** a LangGraph checkpointer keeps each conversation's
+  `history`. Earlier turns are replayed as chat messages: the question,
+  then the SQL plus a 5-row preview as the assistant's reply. "Only for
+  2024." is then answered by editing the previous query.
+- **Self-correction:** guard rejections, Postgres errors and replies
+  without SQL all go back as the next message ("That query failed:
+  column t.title does not exist (SQLSTATE 42703)"). Generate and repair
+  are one node, so a repair sees the whole conversation.
+- **Budget:** at most 3 SQL attempts + 1 answer call per turn
+  (`TEXT_TO_SQL_MAX_ATTEMPTS`, `TEXT_TO_SQL_HISTORY_TURNS`). An empty
+  result or a turn out of attempts gets a reply written in code, with no
+  call.
+- **M2 memory is in-process** (`InMemorySaver`); the M3 API switches to
+  the Postgres checkpointer (ADR 0019).
+
+### Safe execution
 
 Three layers keep model-written SQL harmless, each enforced by a
 different component (ADR 0018):
@@ -76,8 +108,10 @@ uv run text-to-sql schema             # the schema exactly as the model sees it
 
 # Local model (no API key); or set AICORE_* for Cloudflare
 export AICORE_PROVIDER=ollama AICORE_MODEL=qwen2.5:3b AICORE_TIMEOUT_S=600
+uv run text-to-sql chat                # a conversation; empty line to quit
 uv run text-to-sql ask "Which 3 artists have the most albums?"
-uv run text-to-sql eval --split dev   # --limit N for the first N conversations
+uv run text-to-sql eval --agent agent --split test        # or --agent single-shot
+uv run text-to-sql eval --agent agent --split dev --limit 4   # ~1-3 min smoke run
 ```
 
 Results are saved to `evals/results/{agent}-{split}.json`.
@@ -92,6 +126,52 @@ price"). A follow-up's gold SQL is the full query it means. Gold queries
 avoid ties at a `LIMIT`, so every answer is unambiguous.
 
 ## Eval results
+
+### M2: agent vs baseline, held-out test split
+
+Same 11 conversations (16 turns), local `qwen2.5:3b` on CPU, baseline
+prompt v1, agent prompt v1 (`evals/results/*-test.json`):
+
+| Metric | single-shot | agent |
+|---|---|---|
+| Execution accuracy, all turns | 0.62 (10/16) | **0.69 (11/16)** |
+| First turns (stand-alone questions) | **0.91 (10/11)** | 0.82 (9/11) |
+| Follow-up turns | 0.00 (0/5) | **0.40 (2/5)** |
+| Conversations fully correct (2+ turns) | 0.00 (0/3) | **0.33 (1/3)** |
+| Turns whose SQL ran | 0.94 (15/16) | **1.00 (16/16)** |
+| Turns that ran only after a repair | - | 1/16 |
+| LLM calls per turn | 1.0 | 1.9 (1.1 SQL attempts + answer) |
+| Latency per turn | p50 12.2 s, p95 34.7 s | p50 20.7 s, p95 89.7 s |
+| Cost per turn | $0 (local) | $0 (local) |
+
+Reading it (16 turns is a small sample; one turn moves a rate by 6 points):
+
+- **Memory is the gain.** Follow-ups went from 0/5 to 2/5: "Show the
+  same, but count the tracks sold instead." and "And in 2023?" now edit
+  the previous query. The baseline answered them as unrelated questions
+  (albums; artists).
+- **Every query ran** (16/16): the one baseline execution error class
+  (`timestamp ~~ unknown`, `LIKE` on a date) did not recur, and one turn
+  was rescued by a repair.
+- **The stand-alone drop is one question** (s14): the agent used a
+  `LEFT JOIN`, so employees with no customers appear with 0, an extra
+  row. Arguably a valid reading; the gold query counts only agents with
+  customers.
+- **What still fails is not fixable by memory or repair**:
+  - c08 ("Which employees are sales support agents?") fails on turn 1 in
+    both: the model never sees that `employee.title` holds the value
+    `'Sales Support Agent'`, so it searches `first_name LIKE '%Sales%'`,
+    and the two follow-ups inherit the wrong filter (own-history
+    scoring). Fix: show a few distinct values for short text columns in
+    the schema.
+  - c07.2 ("How much revenue did *they* bring in?") dropped the 2022
+    filter from the turn before. A 3B model resolving "they"; a
+    stronger model is the first thing to try.
+- **Cost of the gain:** about 2 calls and 1.7x the median latency per
+  turn, mostly the answer call. p95 is a turn with a repair plus a long
+  answer on CPU.
+
+### M1: baseline on the dev split
 
 Baseline `single-shot` (schema in the prompt, one call, no memory, no
 retries), dev split, local `qwen2.5:3b` on CPU, prompt v1
@@ -122,7 +202,7 @@ What the failures say about M2:
 - One reply used a placeholder (`customer_id = <customer_id>`), which
   the guard rejected as unparseable before it reached the database.
 
-The test split (11 conversations) is held back for the M2 comparison.
+The test split was held back for the M2 comparison above.
 
 ## Trade-offs and future work
 
@@ -134,5 +214,12 @@ The test split (11 conversations) is held back for the M2 comparison.
   will use a pool.
 - **3B local model.** Numbers show the shape, not final quality; rerun
   with a stronger model once the Cloudflare quota allows.
-- Next (M2): conversation memory, self-correction from guard and
-  Postgres errors, and a plain-English answer for each result.
+- **Column values are not in the prompt** (see c08 above): adding a few
+  distinct values for low-cardinality text columns is the next quality
+  step.
+- **Repair only catches failures.** A query that runs and returns the
+  wrong rows is not detected; that needs a checker call per turn.
+- **Answers are not graded yet**: the eval scores rows, not the prose.
+- Next (M3): Flask chat API, Postgres checkpointer so conversations
+  survive restarts and are shared across workers, connection pool,
+  Docker one-command run.

@@ -10,6 +10,8 @@ from pathlib import Path
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from text_to_sql_agent.agent import AgentLimits
+
 # projects/03-text-to-sql-agent/ (this file is src/text_to_sql_agent/config.py).
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
@@ -42,3 +44,14 @@ class TextToSqlSettings(BaseSettings):
     # Rows returned to the caller; more are cut off and flagged truncated,
     # so a huge result cannot flood the model's context or the API.
     max_rows: int = Field(default=200, gt=0, le=10_000)
+    # Agent budgets (see AgentLimits). SQL-writing calls per turn: the first
+    # try plus repairs. 4 of 5 baseline errors named their own fix, so one or
+    # two repairs is where the value is; more mostly burns calls.
+    max_attempts: int = Field(default=3, ge=1, le=5)
+    # Earlier turns replayed into the prompt. Follow-ups refer to the last
+    # turn or two; a fixed window keeps the prompt size bounded.
+    history_turns: int = Field(default=3, ge=0, le=10)
+
+    def agent_limits(self) -> AgentLimits:
+        """The agent budgets as one object."""
+        return AgentLimits(max_attempts=self.max_attempts, history_turns=self.history_turns)

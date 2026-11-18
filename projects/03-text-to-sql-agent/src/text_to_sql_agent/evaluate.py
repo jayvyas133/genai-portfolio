@@ -49,6 +49,8 @@ class TurnResult(BaseModel):
     rows: int | None = None
     error_kind: TurnError | None = None
     error: str | None = None
+    answer: str | None = None
+    attempts: int = Field(default=1, ge=0)
     latency_ms: float = Field(default=0.0, ge=0)
     llm_calls: int = Field(default=0, ge=0)
     cost_usd: float = Field(default=0.0, ge=0)
@@ -75,7 +77,7 @@ class EvalRun(BaseModel):
 
     agent: str
     model: str
-    sql_prompt_version: str
+    prompt_version: str
     split: Split | None
     created_at: datetime
     cases: list[CaseResult]
@@ -137,6 +139,8 @@ async def evaluate(
                         "rows": len(answer.result.rows) if answer.result else None,
                         "error_kind": answer.error_kind,
                         "error": answer.error,
+                        "answer": answer.answer,
+                        "attempts": answer.attempts,
                     }
                 )
             records = tracer.records[before:]
@@ -185,6 +189,10 @@ def format_run(run: EvalRun) -> str:
             _ratio(sum(c.correct for c in conversations), len(conversations)),
         ),
         ("Turns whose SQL ran", _ratio(sum(t.rows is not None for t in turns), len(turns))),
+        (
+            "Turns that ran only after a repair",
+            _ratio(sum(t.attempts > 1 and t.rows is not None for t in turns), len(turns)),
+        ),
     ]
     tags = sorted({tag for t in turns for tag in t.tags})
     errors = {
@@ -195,7 +203,7 @@ def format_run(run: EvalRun) -> str:
     cost = sum(t.cost_usd for t in turns)
     latencies = [t.latency_ms for t in turns]
     lines = [
-        f"Agent: {run.agent} | model: {run.model} | prompt {run.sql_prompt_version} | "
+        f"Agent: {run.agent} | model: {run.model} | prompt {run.prompt_version} | "
         f"split: {run.split or 'all'} | {len(run.cases)} conversations, {n} turns",
         "",
         "| Metric | Value |",
@@ -207,7 +215,8 @@ def format_run(run: EvalRun) -> str:
         "Errors: " + ", ".join(f"{k} {v}" for k, v in errors.items()),
         f"Latency per turn: p50 {_percentile(latencies, 50) / 1000:.1f} s, "
         f"p95 {_percentile(latencies, 95) / 1000:.1f} s",
-        f"LLM calls per turn: {sum(t.llm_calls for t in turns) / n if n else 0:.1f}",
+        f"LLM calls per turn: {sum(t.llm_calls for t in turns) / n if n else 0:.1f}, "
+        f"SQL attempts per turn: {sum(t.attempts for t in turns) / n if n else 0:.1f}",
         f"Cost: ${cost / n if n else 0:.5f} per turn (${cost:.4f} total)",
         "",
         "Per turn:",

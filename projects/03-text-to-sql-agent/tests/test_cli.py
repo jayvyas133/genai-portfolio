@@ -18,7 +18,7 @@ def test_table_says_how_many_rows_are_hidden_and_if_truncated() -> None:
 
 def test_parser_defaults_and_choices() -> None:
     args = build_parser().parse_args(["eval", "--split", "dev", "--limit", "3"])
-    assert (args.agent, args.split, args.limit) == ("single-shot", "dev", 3)
+    assert (args.agent, args.split, args.limit) == ("agent", "dev", 3)
     assert build_parser().parse_args(["load-db", "--reset"]).reset
     with pytest.raises(SystemExit):
         build_parser().parse_args(["eval", "--agent", "nope"])
