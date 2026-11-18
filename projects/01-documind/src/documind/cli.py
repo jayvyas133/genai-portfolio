@@ -1,4 +1,4 @@
-"""Command line: ``documind init-db``, ``ingest``, ``eval``, ``ask`` and ``eval-answers``.
+"""Command line for DocuMind: ingestion, evals, ``ask`` and ``serve`` (the HTTP API).
 
 Run with ``uv run documind <command>``. Settings come from environment
 variables or ``.env`` (``DOCUMIND_*`` for DocuMind, ``AICORE_*`` for the
@@ -6,11 +6,9 @@ models).
 """
 
 import argparse
-import asyncio
 import logging
-import sys
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from datetime import UTC, datetime
 
 import psycopg
@@ -19,12 +17,14 @@ from aicore.errors import LLMError
 from aicore.providers.factory import build_client
 from aicore.tracing import CallRecord, InMemoryTracer, LogTracer
 
+from documind import aio
 from documind.answer_eval import (
     JUDGE_VERSION,
     AnswerEvalRun,
     evaluate_answers,
     format_answer_run,
 )
+from documind.api import create_app
 from documind.ask import answer_question, refusal_message
 from documind.config import DocumindSettings
 from documind.corpus import load_documents
@@ -170,11 +170,6 @@ async def run_eval_answers(
     print(f"Saved {path}")
 
 
-def _loop_factory() -> Callable[[], asyncio.AbstractEventLoop] | None:
-    """Return a selector loop on Windows; psycopg async cannot use Proactor."""
-    return asyncio.SelectorEventLoop if sys.platform == "win32" else None
-
-
 def main(argv: Sequence[str] | None = None) -> int:
     """Parse arguments, run the command and return the process exit code."""
     parser = argparse.ArgumentParser(prog="documind", description="DocuMind RAG service.")
@@ -210,6 +205,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         default="hybrid-rerank",
         help="default: hybrid-rerank",
     )
+    serve_cmd = commands.add_parser(
+        "serve", help="Run the HTTP API on Flask's development server (gunicorn in Docker)."
+    )
+    serve_cmd.add_argument("--host", default="127.0.0.1", help="default: 127.0.0.1")
+    serve_cmd.add_argument("--port", type=int, default=8000, help="default: 8000")
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -217,6 +217,9 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     try:
         settings = DocumindSettings()
+        if args.command == "serve":
+            create_app().run(host=args.host, port=args.port)
+            return 0
         if args.command == "init-db":
             coro = run_init_db(settings)
         elif args.command == "ingest":
@@ -228,7 +231,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         else:
             split = None if args.split == "all" else args.split
             coro = run_eval(settings, LLMSettings(), args.retriever, split, args.k)
-        asyncio.run(coro, loop_factory=_loop_factory())
+        aio.run(coro)
     except psycopg.OperationalError as exc:
         logger.error("Postgres not reachable (%s); %s", exc, _POSTGRES_HINT)
         return 1

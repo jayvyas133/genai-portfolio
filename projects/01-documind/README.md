@@ -8,8 +8,9 @@ through [`aicore`](../../packages/aicore) (Cloudflare Workers AI: BGE (BAAI
 General Embedding) `bge-base-en-v1.5` embeddings, `bge-reranker-base`
 reranker, `llama-3.3-70b-instruct-fp8-fast` for answers).
 
-_Status: M5 (cited answers, refusals, guardrails) done. The HTTP API
-follows in M6._
+_Status: M6 done: an HTTP (HyperText Transfer Protocol) API (Application
+Programming Interface) served by gunicorn in Docker, runnable with one
+command._
 
 ## Problem
 
@@ -50,7 +51,9 @@ flowchart LR
 | `guards.py` | Question checks (length, PII, injection) and the reply's secret-leak check |
 | `ask.py` | `answer_question`: guard → retrieve → generate (shared by CLI, eval and API) |
 | `answer_eval.py` | Refusal accuracy, citation precision, LLM-judge correctness |
-| `cli.py` | `documind init-db`, `ingest`, `eval`, `ask`, `eval-answers` |
+| `api.py` | Flask app: `POST /ask`, `GET /health`, request timeout, JSON errors |
+| `aio.py` | Runs the async pipeline from sync code (CLI, Flask views) |
+| `cli.py` | `documind init-db`, `ingest`, `eval`, `ask`, `eval-answers`, `serve` |
 
 ## How to run
 
@@ -76,6 +79,19 @@ uv run documind eval --split dev --retriever dense   # or sparse, hybrid, dense-
 # 5. Ask a question; score answers on the golden questions
 uv run documind ask "When was CUDA first released?"
 uv run documind eval-answers --split dev
+
+# 6. Serve the HTTP API on http://localhost:8000 (Flask development server)
+uv run documind serve
+```
+
+**One command, Docker only** (no Python or uv on the host). The API runs
+under gunicorn in its own container next to Postgres:
+
+```bash
+docker compose -f infra/docker-compose.yml up -d --build documind-api
+# first time only: create the schema and ingest inside the container
+docker compose -f infra/docker-compose.yml run --rm documind-api documind init-db
+docker compose -f infra/docker-compose.yml run --rm documind-api documind ingest
 ```
 
 Run the commands from the repo root: `.env` is read from the current
@@ -257,6 +273,59 @@ answer. Dev was used to build the prompt; test was run once.
 
 See [ADR 0012](../../docs/adr/0012-documind-cited-generation-refusals-guardrails.md).
 
+## HTTP API
+
+```mermaid
+flowchart LR
+    C[client] -->|POST /ask| G[gunicorn<br/>2 workers x 4 threads]
+    G --> V{validate body<br/>Pydantic, ≤ 64 KB}
+    V -- bad --> E4[400 / 413 JSON error]
+    V -- ok --> L["aio.run: new event loop<br/>30 s overall timeout"]
+    L --> S[open Postgres connection<br/>+ aicore client]
+    S --> A[answer_question<br/>guard → retrieve → generate]
+    A --> R[200 answer or refusal<br/>+ citations, latency, cost]
+    L -- timeout --> T[504]
+    A -- provider failed --> P[502]
+    S -- Postgres down --> D[503]
+```
+
+```bash
+$ curl -s -X POST localhost:8000/ask -H 'Content-Type: application/json'     -d '{"question": "When was CUDA first released?"}'
+{"answer": "CUDA was first released in 2007 [1].", "refused": false,
+ "refusal_reason": null, "message": null,
+ "citations": [{"number": 1, "chunk_id": 412, "document_title": "CUDA", "section": "History"}],
+ "latency_ms": 2140.3, "cost_usd": 0.00055}
+```
+
+| Status | When | Body |
+|---|---|---|
+| 200 | Answered **or refused** (a refusal is a valid answer) | `refused`, `refusal_reason`, `message` |
+| 400 | Not a JSON object, missing/extra fields | `{"error": "invalid_request", "detail": "question: Field required"}` |
+| 413 | Body over 64 KB | `too_large` |
+| 502 | Model provider failed after retries | `model_error` (provider message only in logs) |
+| 503 | Postgres unreachable | `database_unavailable` |
+| 504 | Over `DOCUMIND_REQUEST_TIMEOUT_S` (30 s) | `timeout` |
+
+- **Same pipeline as the CLI.** The view only validates, calls
+  `answer_question` and maps errors to status codes; guards, retrieval
+  and citations are unchanged and covered by the M5 evals.
+- **Error bodies never echo internals.** Provider messages (which can
+  include account details) go to the logs, not the client.
+
+| API overhead (measured in the container) | Time |
+|---|---|
+| Per request, warm worker (new event loop, Postgres connect, client) | 40–85 ms |
+| First request on a worker (imports, first connection) | 0.3–0.5 s |
+| Full answer | ≈ CLI numbers above (p50 2.1 s) + overhead |
+
+The overhead was measured with blocked questions, which open a session
+but make no model call. A full end-to-end latency run through the API is
+pending: the Cloudflare free tier's daily quota (10,000 neurons) ran out
+during this milestone, and the API correctly answered 502 for it. The
+values in the curl output above are illustrative; the shape is exact.
+
+See [ADR 0013](../../docs/adr/0013-documind-http-api.md).
+
 ## Design decisions
 
 - **Chunks never cross a section heading**, and boilerplate (References,
@@ -296,14 +365,14 @@ See [ADR 0012](../../docs/adr/0012-documind-cited-generation-refusals-guardrails
 - Reranking roughly quadruples retrieval latency (p95 up to 1.8 s) and
   adds a paid call per query. Fine before an LLM call that takes
   seconds; too slow for search-as-you-type.
-- If the rerank call fails, the query fails. A fallback to the
-  un-reranked order belongs with the API (M6), along with streaming.
+- If the rerank call fails, the query fails (502). Falling back to the
+  un-reranked hybrid order would keep answering at lower quality.
 - BM25 (Best Matching 25) ranking, or document titles in the keyword
   index, might make hybrid useful without the reranker; not needed now.
 - RRF constant (60) and candidate depths (50, 30) were not swept: with
   36 dev cases a sweep would mostly fit noise.
 - Answers take about 2 s (rerank 0.5–1.3 s, model 1–2 s); one
-  Cloudflare call took 33 s, so the API needs a timeout.
+  Cloudflare call took 33 s, hence the API's 30 s timeout.
 - The judge is the answering model itself; a different model family
   would reduce shared blind spots.
 - Future: a faithfulness judge (one answer used the model's own
@@ -311,4 +380,10 @@ See [ADR 0012](../../docs/adr/0012-documind-cited-generation-refusals-guardrails
   sentence, multi-hop question decomposition, a rerank-score refusal
   gate once there are more unanswerable questions, and a configurable
   question length limit.
-- Next: the Flask HTTP API and a one-command run (M6).
+- API: a new event loop, Postgres connection and HTTP client per request
+  (40–85 ms). A connection pool on one long-lived loop would remove it;
+  not worth the complexity at demo traffic (ADR 0013).
+- API: a provider rate limit (429) is returned as 502; a 503 with
+  `Retry-After` would tell clients when to retry.
+- API: no authentication, rate limiting or streaming; all are needed
+  before exposing it publicly.

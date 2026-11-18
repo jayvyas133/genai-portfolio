@@ -41,6 +41,9 @@ class DocumindSettings(BaseSettings):
     chunk_overlap_words: int = Field(default=40, ge=0)
     embed_batch_size: int = Field(default=50, gt=0, le=100)
     embedding_dimensions: int = Field(default=768, gt=0)
+    # Cap on one HTTP /ask request, end to end. A single Cloudflare call
+    # once took 33 s in M5; past this the API answers 504 instead of hanging.
+    request_timeout_s: float = Field(default=30.0, gt=0)
 
     @model_validator(mode="after")
     def _overlap_smaller_than_chunk(self) -> Self:

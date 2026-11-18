@@ -40,6 +40,23 @@ services:
     ports:
       - "3000:3000"
 
+  # DocuMind HTTP API (projects/01-documind). Model keys come from ../.env.
+  documind-api:
+    build:
+      context: ..
+      dockerfile: projects/01-documind/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - path: ../.env
+        required: false
+    environment:
+      # Inside the compose network Postgres is "postgres", not localhost.
+      DOCUMIND_DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/documind
+    ports:
+      - "8000:8000"
+
 volumes:
   pgdata:
   redisdata:
