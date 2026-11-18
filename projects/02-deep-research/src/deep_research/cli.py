@@ -11,18 +11,24 @@ import logging
 import time
 from collections.abc import Sequence
 from datetime import UTC, datetime
+from typing import Literal
 
+from aicore.client import LLMClient
 from aicore.config import LLMSettings
 from aicore.errors import LLMError
 from aicore.providers.factory import build_client
 from aicore.tracing import InMemoryTracer
 
-from deep_research.baseline import WRITER_PROMPT_VERSION, SingleShotResearcher
+from deep_research.agents import AGENT_PROMPT_VERSION, AgentResearcher, ProgressEvent
+from deep_research.baseline import SingleShotResearcher
 from deep_research.config import DeepResearchSettings
 from deep_research.corpus import TITLES, fetch_documents, load_documents
 from deep_research.evaluate import JUDGE_VERSION, EvalRun, evaluate, format_run
 from deep_research.golden import Split, check_quotes, load_golden
 from deep_research.search import CorpusSearch
+from deep_research.writer import WRITER_PROMPT_VERSION
+
+ResearcherName = Literal["single-shot", "agents"]
 
 logger = logging.getLogger("deep_research")
 
@@ -30,6 +36,20 @@ logger = logging.getLogger("deep_research")
 def _search(settings: DeepResearchSettings) -> CorpusSearch:
     """Load the corpus and build the search index."""
     return CorpusSearch(load_documents(settings.corpus_dir), settings.passage_words)
+
+
+def build_researcher(
+    name: ResearcherName, search: CorpusSearch, client: LLMClient, settings: DeepResearchSettings
+) -> SingleShotResearcher | AgentResearcher:
+    """The researcher called ``name``, wired to ``search`` and ``client``."""
+    if name == "agents":
+        return AgentResearcher(search, client, settings.agent_limits())
+    return SingleShotResearcher(search, client, settings.search_k)
+
+
+def _print_event(event: ProgressEvent) -> None:
+    """Show one agent step as it finishes."""
+    print(f"  [{event.node}] {event.message}", flush=True)
 
 
 async def run_fetch_corpus(settings: DeepResearchSettings) -> None:
@@ -46,13 +66,20 @@ async def run_search(settings: DeepResearchSettings, query: str, k: int) -> None
         print(f"        {p.text[:200]}")
 
 
-async def run_ask(settings: DeepResearchSettings, llm: LLMSettings, question: str) -> None:
-    """Research ``question`` with the baseline and print the report and its sources."""
+async def run_ask(
+    settings: DeepResearchSettings, llm: LLMSettings, question: str, name: ResearcherName
+) -> None:
+    """Research ``question`` and print progress, the report and its sources."""
     tracer = InMemoryTracer()
     client = build_client(llm, tracer=tracer)
+    researcher = build_researcher(name, _search(settings), client, settings)
     start = time.perf_counter()
     try:
-        report = await SingleShotResearcher(_search(settings), client, settings.search_k)(question)
+        if isinstance(researcher, AgentResearcher):
+            report = await researcher.run(question, on_event=_print_event)
+            print()
+        else:
+            report = await researcher(question)
     finally:
         await client.aclose()
     print(report.text)
@@ -60,18 +87,23 @@ async def run_ask(settings: DeepResearchSettings, llm: LLMSettings, question: st
     for i, p in enumerate(report.sources, start=1):
         print(f"[{i}] {p.title} - {p.section} ({p.url})")
     cost = sum(r.cost_usd or 0.0 for r in tracer.records)
-    print(f"\n{time.perf_counter() - start:.1f} s, {len(tracer.records)} LLM call(s), ${cost:.5f}")
+    tokens = [r.usage.input_tokens for r in tracer.records if r.usage]
+    print(
+        f"\n{time.perf_counter() - start:.1f} s, {len(tracer.records)} LLM call(s), "
+        f"max input {max(tokens, default=0)} tokens, ${cost:.5f}"
+    )
 
 
 async def run_eval(
     settings: DeepResearchSettings,
     llm: LLMSettings,
+    name: ResearcherName,
     split: Split | None,
     limit: int | None,
     judge_model: str | None,
     max_claims: int,
 ) -> None:
-    """Evaluate the baseline on the golden ``split``, print the table and save JSON."""
+    """Evaluate researcher ``name`` on the golden ``split``, print the table and save JSON."""
     cases = load_golden(settings.evals_dir / "golden.jsonl", split)[:limit]
     documents = load_documents(settings.corpus_dir)
     if problems := check_quotes(cases, documents):
@@ -79,9 +111,8 @@ async def run_eval(
     judge = judge_model or llm.model
     tracer = InMemoryTracer()
     client = build_client(llm, tracer=tracer)
-    researcher = SingleShotResearcher(
-        CorpusSearch(documents, settings.passage_words), client, settings.search_k
-    )
+    search = CorpusSearch(documents, settings.passage_words)
+    researcher = build_researcher(name, search, client, settings)
     try:
         results, judge_cost = await evaluate(
             cases, researcher, client, tracer, judge_model=judge, max_claims=max_claims
@@ -93,6 +124,7 @@ async def run_eval(
         model=llm.model,
         judge_model=judge,
         writer_prompt_version=WRITER_PROMPT_VERSION,
+        agent_prompt_version=AGENT_PROMPT_VERSION if name == "agents" else None,
         judge_version=JUDGE_VERSION,
         split=split,
         search_k=settings.search_k,
@@ -119,8 +151,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     ask = sub.add_parser("ask", help="research a question and print a cited report")
     ask.add_argument("question")
+    ask.add_argument("--researcher", choices=["single-shot", "agents"], default="agents")
 
     ev = sub.add_parser("eval", help="score the researcher on the golden dataset")
+    ev.add_argument("--researcher", choices=["single-shot", "agents"], default="agents")
     ev.add_argument("--split", choices=["dev", "test"], default=None)
     ev.add_argument("--limit", type=int, default=None, help="only the first N cases")
     ev.add_argument("--judge-model", default=None, help="defaults to AICORE_MODEL")
@@ -142,12 +176,13 @@ def main(argv: Sequence[str] | None = None) -> None:
             case "search":
                 asyncio.run(run_search(settings, args.query, args.k))
             case "ask":
-                asyncio.run(run_ask(settings, LLMSettings(), args.question))
+                asyncio.run(run_ask(settings, LLMSettings(), args.question, args.researcher))
             case "eval":
                 asyncio.run(
                     run_eval(
                         settings,
                         LLMSettings(),
+                        args.researcher,
                         args.split,
                         args.limit,
                         args.judge_model,

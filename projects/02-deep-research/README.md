@@ -1,6 +1,6 @@
 # Deep Research
 
-**Stack:** FastAPI + LangGraph · **Status:** M1 of 4 done (evals and baseline)
+**Stack:** FastAPI + LangGraph · **Status:** M2 of 3 done (agent graph)
 
 A multi-agent research service: a planner splits a question into
 sub-questions, researcher agents work on them in parallel, a writer
@@ -22,27 +22,30 @@ extra calls buy better reports. M1 builds the measuring stick first.
 | M | Scope | State |
 |---|---|---|
 | M1 | Corpus snapshot, search tool, golden dataset, eval runner, single-shot baseline | done |
-| M2 | LangGraph agent graph: planner, parallel researchers, writer | next |
-| M3 | Critic loop with limits (max revisions, token and cost budget) | |
-| M4 | FastAPI service: background research jobs, streamed progress, Docker | |
+| M2 | LangGraph agent graph: planner, parallel researchers, writer, critic with budgets | done |
+| M3 | FastAPI service: background research jobs, streamed progress, Docker | next |
 
-## Architecture (M1)
+## Architecture
 
 ```mermaid
-flowchart LR
-    Q[Question] --> R{{Researcher}}
-    R -->|search query| S{{SearchProvider protocol}}
-    S --> CS[CorpusSearch: BM25 over 2,483 passages]
-    S --> FS[FakeSearch: tests]
-    CS --> C[(38 Wikipedia articles, frozen JSON)]
-    R -->|LLMRequest| A[aicore LLMClient]
-    A --> O[(Ollama / Cloudflare)]
-    R --> REP[Report: text with n markers + sources]
-    REP --> E[Eval runner]
-    G[(golden.jsonl: 13 questions, 61 key facts)] --> E
-    E -->|fact + support judges| A
-    E --> J[results/*.json]
+flowchart TD
+    Q[Question] --> P[plan: 1 LLM call, at most 3 sub-questions]
+    P -->|Send, one branch each| R1[research: sub-question 1]
+    P --> R2[research: sub-question 2]
+    P --> R3[research: sub-question 3]
+    R1 & R2 & R3 -->|findings merged by reducer| W[write: shared writer, outline = sub-questions]
+    W -->|revision budget left| C[critique: code citation check + LLM coverage review]
+    W -->|budget spent| E([Report])
+    C -->|approved| E
+    C -->|fixes| W
+    R1 -.->|LLM writes 2 queries, code searches| S{{SearchProvider: BM25 over corpus}}
 ```
+
+Each research branch makes one LLM call to write keyword queries, then
+code runs them through the search tool and merges the hits round-robin.
+The LLM decides *what* to search, the code decides *that* it searches,
+so every run is bounded: at most 7 LLM calls per report with the default
+limits (ADR 0016).
 
 - **Corpus** (`data/corpus/`): 38 Wikipedia articles on space
   agencies, rockets and missions, fetched once and committed. Research
@@ -51,13 +54,29 @@ flowchart LR
 - **Search** (`search.py`): agents only see `SearchProvider.search(query, k)`.
   `CorpusSearch` splits articles into ~120-word passages that never
   cross a section heading, and ranks them with BM25 (Best Matching 25,
-  a keyword-ranking formula). A web search adapter can be added later
-  without touching the agents.
-- **Report** (`report.py`): every research system returns the same
-  `Report` (text with `[n]` markers plus the numbered source passages),
-  so the baseline and the agents are scored by the same eval.
-- **Baseline** (`baseline.py`): `single-shot` searches once with the
-  raw question and makes one LLM call. It is the bar the agents must clear.
+  a keyword-ranking formula).
+- **Agents** (`agents.py`): a LangGraph `StateGraph`. `Send` fans out
+  one research branch per sub-question; an `operator.add` reducer
+  merges their findings; conditional edges route the critique loop.
+  Every structured step has a fallback, so a small model's bad JSON
+  degrades quality instead of failing the run.
+- **Writer** (`writer.py`): shared by the baseline and the agents, so a
+  difference in eval numbers comes from planning and retrieval, not
+  from different prompts.
+- **Report** (`report.py`): both researchers return the same `Report`
+  (text with `[n]` markers, numbered sources, the outline), so one eval
+  scores both.
+- **Baseline** (`baseline.py`): `single-shot` searches once with the raw
+  question and makes one LLM call. It is the bar the agents must clear.
+
+### Limits
+
+| Setting (`DEEP_RESEARCH_*`) | Default | Caps |
+|---|---|---|
+| `MAX_SUB_QUESTIONS` | 3 | research branches |
+| `QUERIES_PER_SUB_QUESTION` | 2 | searches per branch |
+| `PASSAGES_PER_SUB_QUESTION` | 4 | sources per branch (12 in total at most) |
+| `MAX_REVISIONS` | 1 | critique and rewrite rounds |
 
 ## Evaluation
 
@@ -83,45 +102,48 @@ Development runs use a local model, so these are smoke numbers, not
 the official ones. Official numbers (all 13 cases, a fixed
 `llama-3.3-70b` judge on Cloudflare) will replace them when quota allows.
 
-**Smoke run, 2026-11-18:** `single-shot`, writer and judge both
-`qwen2.5:3b` on Ollama (CPU only), dev split, first 3 cases,
-`--max-claims 3`.
+**Smoke runs, 2026-11-18:** writer, agents and judge all `qwen2.5:3b`
+on Ollama (CPU only), dev split, first 3 cases, `--max-claims 3`.
+Correctness is not the goal of these runs: they show the system works
+end to end and what it costs.
 
-| Metric | Value |
-|---|---|
-| Key facts stated (judge) | 0.88 (15/17), **not trustworthy, see below** |
-| Key facts retrieved (quote in a source) | 0.35 (6/17) |
-| Expected documents retrieved | 1.00 (7/7) |
-| Sentences with a citation | 0.00 (0/14) |
-| Cited sentences supported (judge) | - (nothing cited) |
-| Latency per report | p50 67.6 s, p95 80.3 s |
-| LLM calls per report | 1 |
-| Cost | $0 (local model) |
+| Metric | single-shot | agents |
+|---|---|---|
+| Sentences with a citation | 0.00 (0/14) | **0.41 (9/22)** |
+| Expected documents retrieved | 1.00 (7/7) | 1.00 (7/7) |
+| Key facts retrieved (quote in a source) | 0.35 (6/17) | 0.24 (4/17), lower bound, see below |
+| Key facts stated (judge) | 0.88 (15/17) | 1.00 (11/11) |
+| LLM calls per report | 1 | 7 |
+| Latency per report (p50) | 68 s | 249 s |
+| Cost | $0 (local) | $0 (local) |
 
-What the run showed:
+What the runs showed:
 
-- **The 3B writer ignores the citation rule**: 0 of 14 sentences carry
-  a `[n]` marker. A fix belongs to the M2 writer agent, measured
-  against this run.
-- **The 3B judge is not reliable.** Spot-checking its saved reasons
-  found it marking wrong facts as stated (a report said Webb is in a
-  "sun-synchronous orbit" and that Chandrayaan-2 launched in 2018; both
-  were accepted). "Stated" above "retrieved" (0.88 vs 0.35) is a second
-  sign: the writer fills gaps from its own memory and the judge does not
-  catch the errors. Judge numbers are only reported once a stronger
-  judge model is used.
-- **Search finds the right articles (7/7) but not the right passages
-  (6/17 facts)**: one query with the raw question is too blunt. This is
-  the gap M2's researcher agents (several focused queries) must close.
+- **The critic loop works**: the code check flags uncited sentences and
+  the rewrite adds citations (0% to 41% of sentences). A 3B writer still
+  ignores the rule for most sentences.
+- **"Facts retrieved" undercounts the agents.** It needs the exact
+  golden quote inside a retrieved passage. The agents' queries often
+  find a *different* passage stating the same fact (for example, Webb's
+  launch date from its "Launch" section rather than the introduction),
+  which does not count. Golden facts need alternative quotes, as in
+  DocuMind, before this metric can compare the two systems.
+- **The 3B judge is not reliable** (see M1): it accepted wrong facts
+  and failed to return valid JSON for 7 of 7 support checks in the agents
+  run. Judge rows are shown for completeness only.
+- **Cost of agents**: 7 calls and about 3.7x the latency of one call, on
+  a backend that runs one request at a time. On Cloudflare the three
+  research branches would run at the same time.
 
 ## How to run
 
 ```bash
 uv sync --all-packages
 uv run deep-research search "Luna 25 crash"          # BM25 only, no model
-uv run deep-research ask "Compare Chandrayaan-3 and Luna 25"
-uv run deep-research eval --split dev --limit 3      # small run
-uv run deep-research eval --split dev --judge-model <model>
+uv run deep-research ask "Compare Chandrayaan-3 and Luna 25"   # agents, prints each step
+uv run deep-research ask "..." --researcher single-shot          # the baseline
+uv run deep-research eval --researcher agents --split dev --limit 3
+uv run deep-research eval --researcher single-shot --split dev --judge-model <model>
 ```
 
 Models come from `AICORE_*` settings. For a local CPU-only run:
@@ -129,7 +151,7 @@ Models come from `AICORE_*` settings. For a local CPU-only run:
 ```bash
 ollama pull qwen2.5:3b
 AICORE_PROVIDER=ollama AICORE_MODEL=qwen2.5:3b AICORE_TIMEOUT_S=600 \
-  uv run deep-research eval --split dev --limit 3 --max-claims 3
+  uv run deep-research eval --researcher agents --split dev --limit 3 --max-claims 3
 ```
 
 `uv run deep-research fetch-corpus` re-downloads any missing article.
@@ -145,3 +167,9 @@ AICORE_PROVIDER=ollama AICORE_MODEL=qwen2.5:3b AICORE_TIMEOUT_S=600 \
   Keep the judge model fixed when comparing runs.
 - **13 questions is small**: sized for CPU-only runs; grow it before
   claiming small differences.
+- **Fixed graph, not a free tool-calling agent**: bounded and testable,
+  but it cannot go deeper on a hard question. The critic can only ask for
+  a rewrite; letting it send gaps back to the researchers is the next
+  step if evals show search is the bottleneck.
+- **Parallel only with a parallel backend**: Ollama on CPU queues the
+  research branches; on Cloudflare they overlap.

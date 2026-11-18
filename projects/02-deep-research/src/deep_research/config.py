@@ -10,6 +10,8 @@ from pathlib import Path
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from deep_research.agents import AgentLimits
+
 # projects/02-deep-research/ (this file is src/deep_research/config.py).
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
@@ -36,3 +38,17 @@ class DeepResearchSettings(BaseSettings):
     # enough to hold a fact with its context, short enough that five of
     # them fit a small local model's context window with room to spare.
     passage_words: int = Field(default=120, gt=20)
+    # Agent budgets (see AgentLimits): they cap LLM calls per report.
+    max_sub_questions: int = Field(default=3, ge=1, le=6)
+    queries_per_sub_question: int = Field(default=2, ge=1, le=5)
+    passages_per_sub_question: int = Field(default=4, ge=1, le=10)
+    max_revisions: int = Field(default=1, ge=0, le=3)
+
+    def agent_limits(self) -> AgentLimits:
+        """The agent budgets as one object."""
+        return AgentLimits(
+            max_sub_questions=self.max_sub_questions,
+            queries_per_sub_question=self.queries_per_sub_question,
+            passages_per_sub_question=self.passages_per_sub_question,
+            max_revisions=self.max_revisions,
+        )

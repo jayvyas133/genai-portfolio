@@ -3,8 +3,9 @@
 from aicore.client import LLMClient
 from aicore.config import LLMSettings
 from aicore.providers.fakeai import FakeProvider
-from deep_research.baseline import SingleShotResearcher, build_writer_request
+from deep_research.baseline import SingleShotResearcher
 from deep_research.search import FakeSearch, Passage, SearchHit
+from deep_research.writer import build_writer_request
 
 
 def _hit(pid: str, title: str, text: str) -> SearchHit:
@@ -41,3 +42,14 @@ async def test_researcher_skips_the_model_when_search_finds_nothing() -> None:
     report = await researcher("q")
     assert report.sources == []
     assert fake.calls == []
+
+
+def test_writer_request_adds_outline_draft_and_fixes_when_given() -> None:
+    passage = _hit("a#0", "A", "alpha").passage
+    user = (
+        build_writer_request("Q?", [passage], outline=["Sub 1"], draft="Old.", feedback=["Fix"])
+        .messages[-1]
+        .content
+    )
+    assert "Cover these points:\n- Sub 1" in user
+    assert "Your previous draft:\nOld.\n\nA reviewer asked for these fixes:\n- Fix" in user

@@ -1,0 +1,182 @@
+{
+  "researcher": "agents",
+  "model": "qwen2.5:3b",
+  "judge_model": "qwen2.5:3b",
+  "writer_prompt_version": "v1",
+  "agent_prompt_version": "v1",
+  "judge_version": "v1",
+  "split": "dev",
+  "search_k": 5,
+  "max_claims": 3,
+  "created_at": "2026-11-18T06:16:16.134851Z",
+  "cases": [
+    {
+      "id": "dr-001",
+      "question": "Compare Chandrayaan-3 and Luna 25, which both tried to land near the lunar south pole in August 2023. How did each mission go?",
+      "report": "Chandrayaan-3 successfully landed near the lunar south pole, becoming the first spacecraft to do so, and confirmed the presence of essential chemical elements in the lunar south pole. In contrast, Luna 25, despite its initial plans, failed to land successfully, with the spacecraft crashing into the Moon's surface. The intended landing site for Luna 25 was located at 69.545°S 43.544°E, but the actual impact site was on the steep inner rim of the Pontécoulant G crater, 400 kilometers away from its planned location [1][3][8].",
+      "source_ids": [
+        "chandrayaan-3#49",
+        "chandrayaan-3#1",
+        "isro#14",
+        "chandrayaan-3#45",
+        "luna-25#0",
+        "luna-25#2",
+        "luna-25#6",
+        "luna-25#4",
+        "luna-25#11"
+      ],
+      "expected_titles": [
+        "Luna 25",
+        "Chandrayaan-3"
+      ],
+      "titles_found": [
+        "Luna 25",
+        "Chandrayaan-3"
+      ],
+      "facts_retrieved": [
+        false,
+        true,
+        false,
+        true,
+        true
+      ],
+      "facts_stated": [
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "fact_reasons": [
+        "The report states Luna 25 launched on 10 August 2023 on a Soyuz-2 rocket.",
+        "The report states Luna 25 was Russia's first lunar mission since Luna 24 in 1976.",
+        "The report states Luna 25 crashed into the Moon after a failed manoeuvre.",
+        "The report states Chandrayaan-3 touched down near the lunar south pole on 23 August 2023.",
+        "The report states Chandrayaan-3 was the first soft landing near the lunar south pole."
+      ],
+      "fact_judge_error": false,
+      "sentences": 3,
+      "sentences_cited": 1,
+      "invalid_markers": [],
+      "claims_judged": 0,
+      "claims_supported": 0,
+      "support_judge_errors": 1,
+      "unsupported": [],
+      "latency_ms": 169998.20770003134,
+      "cost_usd": 0.0,
+      "llm_calls": 7,
+      "error": null
+    },
+    {
+      "id": "dr-002",
+      "question": "How do the Hubble Space Telescope and the James Webb Space Telescope differ in launch, orbit, mirror size and the light they observe?",
+      "report": "The Hubble Space Telescope was launched into low Earth orbit on April 24, 1990, aboard Space Shuttle mission STS-31 [1]. In contrast, the James Webb Space Telescope was launched on December 25, 2021, aboard an Ariane 5 rocket from the Guiana Space Center in Kourou, French Guiana [8].\n\nIn terms of orbit, the Hubble Space Telescope operates in a low Earth orbit at an altitude of approximately 545 kilometers (339 miles). The James Webb Space Telescope, on the other hand, is placed in a sun-synchronous orbit at an altitude of about 1.5 million kilometers (930,000 miles) from Earth, with a period of 36 days [3][8].\n\nRegarding the mirror size, the Hubble Space Telescope has a primary mirror with a diameter of 2.4 meters (7.9 feet). The James Webb Space Telescope features a primary mirror with a diameter of 6.5 meters (21.3 feet), making it significantly larger and more sensitive to infrared light [3][8].\n\nIn terms of the light they observe, the Hubble Space Telescope primarily observes visible and ultraviolet light, with some capabilities in the near-infrared. The James Webb Space Telescope, however, is designed to observe across the entire infrared spectrum, including mid-infrared and near-infrared wavelengths, which allows it to observe objects that are too old, distant, or faint for the Hubble Space Telescope [3][8].",
+      "source_ids": [
+        "hubble-space-telescope#101",
+        "hubble-space-telescope#0",
+        "hubble-space-telescope#118",
+        "hubble-space-telescope#3",
+        "james-webb-space-telescope#56",
+        "james-webb-space-telescope#3",
+        "james-webb-space-telescope#0",
+        "james-webb-space-telescope#58",
+        "james-webb-space-telescope#28",
+        "james-webb-space-telescope#31"
+      ],
+      "expected_titles": [
+        "Hubble Space Telescope",
+        "James Webb Space Telescope"
+      ],
+      "titles_found": [
+        "Hubble Space Telescope",
+        "James Webb Space Telescope"
+      ],
+      "facts_retrieved": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "facts_stated": [],
+      "fact_reasons": [],
+      "fact_judge_error": true,
+      "sentences": 8,
+      "sentences_cited": 5,
+      "invalid_markers": [],
+      "claims_judged": 0,
+      "claims_supported": 0,
+      "support_judge_errors": 3,
+      "unsupported": [],
+      "latency_ms": 266527.4129000027,
+      "cost_usd": 0.0,
+      "llm_calls": 7,
+      "error": null
+    },
+    {
+      "id": "dr-003",
+      "question": "Trace India's Chandrayaan lunar programme from Chandrayaan-1 to Chandrayaan-3: when was each mission launched and what did it achieve?",
+      "report": "Chandrayaan-1 was launched on October 22, 2008, and achieved its primary goal of mapping the lunar surface, including the discovery of water molecules in the permanently shadowed regions of the Moon. [1] This mission provided valuable data for understanding the Moon's composition and topography, contributing significantly to the field of lunar science. Chandrayaan-2 was launched on July 22, 2019, but faced several delays. Despite these challenges, the mission included a lander and rover, aiming to conduct detailed studies on the lunar surface. Although the mission did not achieve its primary goal of landing on the Moon, it contributed to the understanding of the Moon's environment and resources. The orbiter continued to operate, providing additional data and insights into lunar phenomena. [1][2][3][4][5][6][7][8]\n\nChandrayaan-3 is currently in the design phase, with a planned launch around 2028. The mission aims to return lunar samples, focusing on the region near Shiv Shakti point, the site of Chandrayaan-3's landing. The rover component of Chandrayaan-3 will explore the lunar surface, complementing the data collected by previous missions. [1][5][6][7][8][9]",
+      "source_ids": [
+        "chandrayaan-2#23",
+        "chandrayaan-1#3",
+        "chandrayaan-1#53",
+        "new-glenn#28",
+        "chandrayaan-1#2",
+        "chandrayaan-1#16",
+        "chandrayaan-2#27",
+        "chandrayaan-2#3",
+        "isro#50",
+        "chandrayaan-3#8"
+      ],
+      "expected_titles": [
+        "Chandrayaan-1",
+        "Chandrayaan-2",
+        "Chandrayaan-3"
+      ],
+      "titles_found": [
+        "Chandrayaan-1",
+        "Chandrayaan-2",
+        "Chandrayaan-3"
+      ],
+      "facts_retrieved": [
+        false,
+        true,
+        false,
+        false,
+        false,
+        false
+      ],
+      "facts_stated": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "fact_reasons": [
+        "Report states the launch date and rocket used for Chandrayaan-1.",
+        "Report states Chandrayaan-1 found water molecules in lunar soil.",
+        "Report states the launch date and rocket used for Chandrayaan-2.",
+        "Report states the crash of the lander and the cause of the crash.",
+        "Report states the continued operation of the orbiter after the failed landing.",
+        "Report states the landing date and the location near the lunar south pole."
+      ],
+      "fact_judge_error": false,
+      "sentences": 11,
+      "sentences_cited": 3,
+      "invalid_markers": [],
+      "claims_judged": 0,
+      "claims_supported": 0,
+      "support_judge_errors": 3,
+      "unsupported": [],
+      "latency_ms": 249348.3816999942,
+      "cost_usd": 0.0,
+      "llm_calls": 7,
+      "error": null
+    }
+  ],
+  "judge_cost_usd": 0.0
+}

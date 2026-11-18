@@ -30,6 +30,8 @@ class Report(BaseModel):
     question: str
     text: str
     sources: list[Passage] = Field(default_factory=list)
+    # The sub-questions the report was planned around (empty for the baseline).
+    outline: list[str] = Field(default_factory=list)
 
 
 Researcher = Callable[[str], Awaitable[Report]]

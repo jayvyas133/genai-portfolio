@@ -134,6 +134,7 @@ class EvalRun(BaseModel):
     model: str
     judge_model: str
     writer_prompt_version: str
+    agent_prompt_version: str | None = None
     judge_version: str
     split: Split | None
     search_k: int
@@ -366,7 +367,8 @@ def format_run(run: EvalRun) -> str:
     }
     lines = [
         f"Researcher: {run.researcher} | model: {run.model} | judge: {run.judge_model} | "
-        f"writer {run.writer_prompt_version}, judge {run.judge_version} | "
+        f"writer {run.writer_prompt_version}, agents {run.agent_prompt_version or '-'}, "
+        f"judge {run.judge_version} | "
         f"split: {run.split or 'all'} | {n} cases | search k={run.search_k}",
         "",
         "| Metric | Value |",
