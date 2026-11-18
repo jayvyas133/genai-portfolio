@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GenAI Portfolio</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>GenAI Portfolio</h1>
+    <p>Three AI (Artificial Intelligence) services behind one URL. Each tab calls its own API.</p>
+    <nav role="tablist">
+      <button role="tab" data-tab="documind" aria-selected="true">DocuMind</button>
+      <button role="tab" data-tab="research" aria-selected="false">Deep Research</button>
+      <button role="tab" data-tab="sql" aria-selected="false">Text-to-SQL chat</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="documind" class="panel">
+      <p class="lede">Question answering over a document collection with cited sources.
+        RAG (Retrieval-Augmented Generation): hybrid search, reranking, refusals.</p>
+      <form id="documind-form">
+        <input name="question" placeholder="Ask about the documents..." maxlength="1000" required>
+        <button type="submit">Ask</button>
+      </form>
+      <div id="documind-out" class="out"></div>
+    </section>
+
+    <section id="research" class="panel" hidden>
+      <p class="lede">A planner, parallel researchers, a writer and a critic produce a cited report.
+        Progress streams live; a report takes a few minutes on a local model.</p>
+      <form id="research-form">
+        <input name="question" placeholder="e.g. Compare Chandrayaan-3 and Luna 25" minlength="3" maxlength="500" required>
+        <button type="submit">Research</button>
+      </form>
+      <ol id="research-progress" class="progress"></ol>
+      <div id="research-out" class="out"></div>
+    </section>
+
+    <section id="sql" class="panel" hidden>
+      <p class="lede">Chat with a music-store database (Chinook). Follow-ups such as
+        "Only for 2024." build on the previous question. Queries are read-only.</p>
+      <div id="chat" class="chat" aria-live="polite"></div>
+      <form id="sql-form">
+        <input name="question" placeholder="e.g. What is the total revenue for each billing country?" maxlength="2000" required>
+        <button type="submit">Send</button>
+        <button type="button" id="sql-new" class="secondary">New conversation</button>
+      </form>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
