@@ -58,13 +58,19 @@ CREATE INDEX IF NOT EXISTS chunks_content_hash ON chunks (content_hash);
 # pgvector's HNSW search returns at most ``hnsw.ef_search`` rows (default 40).
 _DEFAULT_EF_SEARCH = 40
 
-# Turn a question into an OR full-text query. plainto_tsquery stems the
-# words and drops stop words, but joins them with AND, so a chunk would
-# need every word of the question. Swapping '&' for '|' keeps any chunk
-# with at least one word; ts_rank_cd then ranks chunks with more of them,
-# close together, higher. The lexemes are already stemmed, so they are
-# re-parsed with the 'simple' configuration (lower-case only). A question
-# of only stop words gives an empty query, which matches nothing.
+# Build a full-text query that matches chunks containing ANY word of the
+# question (OR), not ALL words (AND). ts_rank_cd later ranks chunks with
+# more matching words higher.
+#
+# Example, question = "What is the refund policy?"
+#   1. plainto_tsquery('english', ...)  -> 'refund' & 'polici'
+#      (drops stop words "what/is/the", stems "policy" -> "polici")
+#   2. ::text + replace(' & ', ' | ')   -> 'refund' | 'polici'
+#   3. to_tsquery('simple', ...)        -> 'refund' | 'polici'
+#      ('simple' only lower-cases, so the already-stemmed words stay as-is)
+#
+# A question of only stop words (e.g. "what is it") gives an empty query
+# and matches nothing.
 _OR_QUERY = "to_tsquery('simple', replace(plainto_tsquery('english', %s)::text, ' & ', ' | '))"
 
 

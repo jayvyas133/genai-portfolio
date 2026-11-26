@@ -9,7 +9,7 @@ from typing import Literal
 
 from pydantic import Field, HttpUrl, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
+    
 ProviderName = Literal["fake", "ollama", "cloudflare"]
 
 

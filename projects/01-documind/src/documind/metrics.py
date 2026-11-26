@@ -19,7 +19,7 @@ a function of those ranks, for any cut-off ``k``:
   matters because the LLM reads the top chunks most reliably.
 
 Unanswerable cases have no evidence, so they are left out of retrieval
-metrics; they are scored on refusal in M5 (generation evals).
+metrics; they are scored on refusal ).
 """
 
 import math
@@ -74,7 +74,7 @@ class CaseRetrieval(BaseModel):
     evidence_ranks: list[int | None]
     latency_ms: float | None = Field(default=None, ge=0)
 
-    @computed_field  # type: ignore[prop-decorator]
+    @computed_field  
     @property
     def first_rank(self) -> int | None:
         """Rank of the first relevant chunk for any evidence, or ``None``."""

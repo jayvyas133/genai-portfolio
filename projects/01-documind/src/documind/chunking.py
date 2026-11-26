@@ -134,12 +134,14 @@ def window_words(text: str, size: int, overlap: int) -> list[str]:
 
 def chunk_document(doc: Document, size: int, overlap: int) -> list[Chunk]:
     """Split ``doc`` into chunks numbered 0, 1, 2, ... in reading order."""
-    pieces = [
-        (section.path, window)
-        for section in split_sections(doc.text)
-        for window in window_words(section.text, size, overlap)
-    ]
-    return [
-        Chunk(document_title=doc.title, ordinal=i, section=path, text=text)
-        for i, (path, text) in enumerate(pieces)
-    ]
+    chunks: list[Chunk] = []
+    for section in split_sections(doc.text):
+        for window in window_words(section.text, size, overlap):
+            chunk = Chunk(
+                document_title=doc.title,
+                ordinal=len(chunks),
+                section=section.path,
+                text=window,
+            )
+            chunks.append(chunk)
+    return chunks

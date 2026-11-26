@@ -1,9 +1,7 @@
 """Retrievers: turn a question into a ranked list of chunks.
 
-Every retriever has the same shape (``Retriever``), so the eval runner
-and, later, the API can swap dense, hybrid and reranked retrieval without
-changing. M3 has the dense baseline; M4 adds sparse (full-text),
-hybrid and reranked retrieval and measures them against it.
+All retrievers share one interface (``Retriever``), so callers can swap
+them freely.
 """
 
 from collections.abc import Sequence
@@ -15,9 +13,8 @@ from aicore.models import EmbedRequest, RerankRequest
 from documind.pipeline import DimensionMismatchError
 from documind.store import RetrievedChunk
 
-# The constant from the original RRF paper (Cormack et al., 2009). It damps
-# the gap between top ranks: with c = 60, rank 1 scores 1/61 and rank 2
-# 1/62, so one list's first place cannot outvote agreement between lists.
+# Standard RRF constant (Cormack et al., 2009). It keeps top ranks close
+# (1/61 vs 1/62), so agreement between lists beats one list's first place.
 RRF_C = 60
 
 RetrieverName = Literal["dense", "sparse", "hybrid", "dense-rerank", "hybrid-rerank"]
@@ -57,10 +54,7 @@ def build_retriever(
 ) -> Retriever:
     """Assemble the retriever called ``name`` over ``store``.
 
-    ``-rerank`` names wrap the first stage in ``RerankingRetriever``, so
-    ``dense-rerank`` and ``hybrid-rerank`` show whether the reranker
-    still needs hybrid search underneath it. Default depths are used:
-    50 candidates per search for hybrid, 30 for the reranker.
+    ``-rerank`` names add a reranker on top of the first stage.
     """
     dense = DenseRetriever(store, client, dimensions)
     match name:
@@ -79,19 +73,17 @@ def build_retriever(
 
 
 class DenseRetriever:
-    """Embed the query, then take the nearest chunks by cosine distance.
+    """Embed the query, then return the nearest chunks by cosine distance.
 
-    The query is embedded with ``input_type="query"``: BGE (BAAI General
-    Embedding) expects an instruction prefix on short queries but not on
-    passages, and aicore's adapter adds it. Chunks were embedded as
-    documents during ingestion.
+    ``input_type="query"`` lets aicore add the query prefix BGE (BAAI
+    General Embedding) expects.
     """
 
     def __init__(self, store: DenseIndex, client: LLMClient, dimensions: int) -> None:
         """Search ``store``, embedding queries with ``client``.
 
-        ``dimensions`` is the vector size the store was built with; a
-        query vector of another size means the embedding model changed.
+        ``dimensions`` is the store's vector size, used to catch a changed
+        embedding model.
         """
         self._store = store
         self._client = client
@@ -117,10 +109,10 @@ class DenseRetriever:
 
 
 class SparseRetriever:
-    """Keyword search: rank chunks by the question's words (Postgres full-text).
+    """Keyword search with Postgres full-text.
 
-    Finds exact names and numbers ("RTX 3090", "HBM2e") that an embedding
-    can blur, but misses paraphrases. No model call, so it is fast and free.
+    Good at exact names and numbers ("RTX 3090"), bad at paraphrases.
+    No model call, so fast and free.
     """
 
     def __init__(self, store: SparseIndex) -> None:
@@ -130,8 +122,7 @@ class SparseRetriever:
     async def retrieve(self, query: str, k: int) -> list[RetrievedChunk]:
         """Return up to ``k`` chunks matching words of ``query``, best first.
 
-        May return fewer than ``k`` (or none) when few chunks share a word
-        with the query.
+        May return fewer than ``k``, or none.
 
         Raises:
             ValueError: If ``k`` < 1.
@@ -144,13 +135,8 @@ def reciprocal_rank_fusion(
 ) -> list[RetrievedChunk]:
     """Merge ranked lists into one: each chunk scores the sum of 1 / (c + rank).
 
-    Only ranks are used, never the lists' own scores: cosine similarity
-    and ``ts_rank_cd`` are on different scales, so adding them would let
-    one list dominate. A chunk near the top of several lists beats one at
-    the top of a single list. Returned chunks carry the fused score.
-    Ties keep the order in which chunks were first seen (earlier lists
-    first), so results are repeatable. Each list is assumed to hold a
-    chunk at most once.
+    Uses ranks only, because the lists' scores are on different scales.
+    Returned chunks carry the fused score; ties keep first-seen order.
 
     Raises:
         ValueError: If ``c`` is negative.
@@ -164,7 +150,7 @@ def reciprocal_rank_fusion(
         for rank, chunk in enumerate(ranking, start=1):
             scores[chunk.chunk_id] = scores.get(chunk.chunk_id, 0.0) + 1 / (c + rank)
             chunks.setdefault(chunk.chunk_id, chunk)
-    # sorted() is stable and dicts keep insertion order: ties stay first-seen.
+    # Stable sort over an insertion-ordered dict keeps ties first-seen.
     order = sorted(scores, key=lambda cid: scores[cid], reverse=True)
     return [chunks[cid].model_copy(update={"score": scores[cid]}) for cid in order]
 
@@ -172,14 +158,8 @@ def reciprocal_rank_fusion(
 class HybridRetriever:
     """Dense and sparse search, merged with RRF (Reciprocal Rank Fusion).
 
-    Dense search finds paraphrases; sparse search finds exact names and
-    numbers. Each fetches ``candidates`` chunks, so a chunk ranked 30th
-    by one search can still rise if the other ranks it well; the fused
-    list is cut to ``k``.
-
-    The two searches run one after the other, not concurrently: they share
-    one Postgres connection, which runs one query at a time, and sparse
-    search takes milliseconds next to the embedding call.
+    Dense catches paraphrases, sparse catches exact terms. Searches run
+    sequentially because they share one Postgres connection.
     """
 
     def __init__(
@@ -204,9 +184,6 @@ class HybridRetriever:
     async def retrieve(self, query: str, k: int) -> list[RetrievedChunk]:
         """Return the top ``k`` chunks of the fused dense and sparse results.
 
-        Each search is asked for ``max(k, candidates)`` chunks, so ``k``
-        larger than ``candidates`` still fills.
-
         Raises:
             ValueError: If ``k`` < 1.
             Any error from the underlying retrievers.
@@ -221,16 +198,11 @@ class HybridRetriever:
 
 
 class RerankingRetriever:
-    """Re-sort another retriever's top candidates with a cross-encoder reranker.
+    """Re-sort another retriever's top candidates with a cross-encoder.
 
-    The embedder scores the question and each chunk separately, then
-    compares vectors. A reranker (``bge-reranker-base``) reads the
-    question and one chunk together and scores how well that chunk
-    answers it: slower, but more precise. So it only sees ``candidates``
-    chunks, and the first-stage retriever's job becomes recall.
-
-    Each chunk is sent with its ``Title > Section`` header, as it was
-    embedded, so the reranker knows which document "it" refers to.
+    The reranker reads question and chunk together: slower than embeddings
+    but more precise, so it only sees the top ``candidates``. Chunks are
+    sent with their ``Title > Section`` header for context.
     """
 
     def __init__(self, inner: Retriever, client: LLMClient, candidates: int = 30) -> None:
@@ -249,8 +221,7 @@ class RerankingRetriever:
     async def retrieve(self, query: str, k: int) -> list[RetrievedChunk]:
         """Return the ``k`` candidates the reranker scores highest, best first.
 
-        Returned chunks carry the reranker's score. No rerank call is made
-        when ``inner`` finds nothing.
+        Returned chunks carry the reranker's score.
 
         Raises:
             ValueError: If ``k`` < 1.

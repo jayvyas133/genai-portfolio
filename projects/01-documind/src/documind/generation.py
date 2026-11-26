@@ -65,7 +65,7 @@ _MARKER_RE = re.compile(r"\[(\d+)\]")
 
 
 class ModelAnswer(BaseModel):
-    """The JSON the model must return (the schema is sent with the request)."""
+    """the model must return (the schema is sent with the request)."""
 
     model_config = ConfigDict(extra="forbid")
 

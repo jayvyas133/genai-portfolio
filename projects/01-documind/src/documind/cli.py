@@ -184,7 +184,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--retriever",
         choices=RETRIEVER_NAMES,
         default="hybrid-rerank",
-        help="default: hybrid-rerank (chosen in M4, see ADR 0011)",
+        help="default: hybrid-rerank",
     )
     eval_cmd.add_argument("--k", type=int, default=10, help="chunks to retrieve (default: 10)")
     ask_cmd = commands.add_parser("ask", help="Answer a question from the documents, with sources.")

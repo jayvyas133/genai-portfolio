@@ -51,8 +51,6 @@ async def answer_question(
         logger.info("Question blocked by %s", err.guard)
         return Answer(text="", refusal_reason="blocked", blocked_by=err.guard)
     chunks = await retriever.retrieve(checked, k)
-    # Logged, not used as a gate yet: the scores show whether a
-    # threshold would separate unanswerable questions (see ADR 0012).
     logger.info("Retrieved scores: %s", [round(c.score, 3) for c in chunks])
     return await generate_answer(checked, chunks, client)
 
